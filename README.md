@@ -44,9 +44,15 @@ TODO: Record gif "movie"
 
 ## Installation
 
-```
-TODO: Add instructions about compiling from source (what about precompiled binaries?)
-```
+### Standalone
+
+`lmk` can be easily installed as an executable. Download the latest [compiled binary forms of gh](https://github.com/jingweno/gh/releases)
+for Linux and Darwin.
+
+### Source
+
+To install `lmk` from source, you need to have a [Go development environment](http://golang.org/doc/install),
+version 1.2 or higher, and run `go install github.com/fgrehm/lmk`
 
 
 ## Usage
@@ -56,6 +62,25 @@ Usage: lmk [options...] command
 
 Options:
   -m  Message to display in case of success, defaults to "[command] has completed successfully"
+```
+
+### Linux
+
+Since most Linux distributions have `notify-send` pre-installed, everything
+should work out of the box. If not, please [let me know](https://github.com/fgrehm/lmk/issues/new).
+
+### OS X
+
+You will need to create a `notify-send` script, available on `$PATH`. The script can forward the message to either
+[Growl](http://growl.info/) with [GrowlNotify](http://growl.info/downloads) (version 1.2.2 is free but unreliable)
+or to the [Notification Center](http://support.apple.com/kb/HT5362) available on OS X 10.8+
+using f.ex. [terminal-notifier](https://github.com/alloy/terminal-notifier).
+
+A (too) primitive script integrating with Growl:
+
+```bash
+#!/bin/bash
+growlnotify -t "Heads up!" -m "$*"
 ```
 
 
