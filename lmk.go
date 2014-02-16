@@ -10,6 +10,10 @@ import (
 )
 
 func main() {
+	if len(os.Args) == 1 {
+		log.Fatalf("No command was provided to lmk")
+	}
+
 	// https://gobyexample.com/execing-processes
 	executable, lookErr := exec.LookPath(os.Args[1])
 	if lookErr != nil {
