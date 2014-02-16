@@ -27,58 +27,23 @@ func main() {
 	flag.Usage = func() {
 		fmt.Fprint(os.Stderr, usage)
 	}
-
 	flag.Parse()
 	if flag.NArg() < 1 {
 		usageAndExit("")
 	}
 
-	if len(flag.Args()) == 0 {
-		log.Fatalf("No command was provided to lmk")
-	}
+	cmd := flag.Args()
 
-	// https://gobyexample.com/execing-processes
-	flagArgs := flag.Args()
-	executable, lookErr := exec.LookPath(flagArgs[0])
-	if lookErr != nil {
-		log.Fatal(lookErr)
-	}
-	executableArgs := flagArgs[1:]
+	executable, args := getExecutableAndArgs(cmd)
+	log.Printf("Running %s", cmd)
+	err := run(executable, args...)
 
-	log.Printf("Running %s", flagArgs)
-	err := run(executable, executableArgs...)
-
-	var icon, msg string
-	if err != nil {
-		icon = "software-update-urgent"
-		msg = fmt.Sprintf("%s has errored!", flagArgs)
-	} else {
-		icon = "emblem-default"
-		if *flagMessage != "" {
-			msg = *flagMessage
-		} else {
-			msg = fmt.Sprintf(defaultMessage, flagArgs)
-		}
-	}
-	go func() {
-		for {
-			log.Print("Notifying")
-			exec.Command("notify-send", "-i", icon, "--", "Heads up!", msg).Run()
-			time.Sleep(time.Second * 30)
-		}
-	}()
-
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt)
-
-	in := bufio.NewReader(os.Stdin)
-	_, err = in.ReadString('\n')
-	if err != nil {
-		panic(err)
-	}
+	icon, msg := getIconAndMessage(err, cmd)
+	startNotificationLoop(icon, msg)
+	waitForEnter()
 }
 
-var run = func(executable string, args ...string) error {
+func run (executable string, args ...string) error {
 	cmd := exec.Command(executable, args...)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
@@ -96,4 +61,53 @@ func usageAndExit(message string) {
 	flag.Usage()
 	fmt.Fprintf(os.Stderr, "\n")
 	os.Exit(1)
+}
+
+func getExecutableAndArgs(cmd []string) (string, []string) {
+	if len(cmd) == 0 {
+		log.Fatalf("No command was provided to lmk")
+	}
+
+	executable, lookErr := exec.LookPath(cmd[0])
+	if lookErr != nil {
+		log.Fatal(lookErr)
+	}
+	return executable, cmd[1:]
+}
+
+func getIconAndMessage(err error, cmd []string) (icon, msg string) {
+	if err != nil {
+		icon = "software-update-urgent"
+		msg = fmt.Sprintf("%s has errored!", cmd)
+	} else {
+		icon = "emblem-default"
+		if *flagMessage != "" {
+			msg = *flagMessage
+		} else {
+			msg = fmt.Sprintf(defaultMessage, cmd)
+		}
+	}
+
+	return
+}
+
+func startNotificationLoop(icon, msg string) {
+	go func() {
+		for {
+			log.Print("Notifying")
+			exec.Command("notify-send", "-i", icon, "--", "Heads up!", msg).Run()
+			time.Sleep(time.Second * 30)
+		}
+	}()
+}
+
+func waitForEnter() {
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt)
+
+	in := bufio.NewReader(os.Stdin)
+	_, err := in.ReadString('\n')
+	if err != nil {
+		panic(err)
+	}
 }
