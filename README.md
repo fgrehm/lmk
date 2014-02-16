@@ -46,8 +46,8 @@ TODO: Record gif "movie"
 
 ### Standalone
 
-`lmk` can be easily installed as an executable. Download the latest [compiled binary forms of gh](https://github.com/jingweno/gh/releases)
-for Linux and Darwin.
+`lmk` can be easily installed as an executable. Download the latest [compiled
+binary forms of lmk](https://github.com/fgrehm/lmk/releases) for Linux and Darwin.
 
 ### Source
 
