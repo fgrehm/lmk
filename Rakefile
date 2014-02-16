@@ -1,5 +1,3 @@
-task :default => :test
-
 desc 'Update dependencies'
 task :deps do
   puts '=====> Updating dependencies...'
@@ -11,12 +9,6 @@ desc 'Build lmk'
 task :build => :deps do
   puts '=====> Building...'
   sh 'go build ./...'
-end
-
-desc 'Run unit tests'
-task :test => :build do
-  puts '=====> Running specs...'
-  sh 'go test ./...'
 end
 
 desc 'Cross compile'
