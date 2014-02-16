@@ -34,7 +34,7 @@ notification poping up on your desktop.
 
 But that's not enough, what if you miss the notification while you are away from
 the keyboard? Well, in that case `lmk` will keep letting you know that the
-command finished every minute until you go back to the terminal session that
+command finished every 30 seconds until you go back to the terminal session that
 you left the command running and hit Enter.
 
 ```
@@ -46,6 +46,16 @@ TODO: Record gif "movie"
 
 ```
 TODO: Add instructions about compiling from source (what about precompiled binaries?)
+```
+
+
+## Usage
+
+```sh
+Usage: lmk [options...] command
+
+Options:
+  -m  Message to display in case of success, defaults to "[command] has completed successfully"
 ```
 
 
