@@ -49,18 +49,6 @@ TODO: Add instructions about compiling from source (what about precompiled binar
 ```
 
 
-## TODO
-
-- [ ] Setup automated testing
-- [ ] Handle no command provided
-- [ ] "Press enter to continue"
-- [ ] Configure time taken between reminders
-- [ ] Default message with commmand ran
-- [ ] Trap Ctrl+C, forward to running process and exit normally
-- [ ] Support for custom message
-- [ ] Exit with same exit code of the process ran
-- [ ] Make it work with aliases
-
 ## Contributing
 
 1. Fork it

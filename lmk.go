@@ -29,8 +29,6 @@ func main() {
 	}
 
 	log.Print("Leaving...")
-	// FIXME: Do we need to "kill" the goroutine? (NO)
-	// FIXME: Trap Ctrl+C
 }
 
 func runCmd() {
@@ -40,8 +38,6 @@ func runCmd() {
 		panic(lookErr)
 	}
 	args := os.Args[2:]
-	// FIXME: Should handle errors and Ctrl+C here
-	//
 	system(binary, args...)
 }
 
