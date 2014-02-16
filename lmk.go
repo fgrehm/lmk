@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"os/signal"
 	"time"
 )
 
@@ -39,6 +40,9 @@ func main() {
 			time.Sleep(time.Second * 30)
 		}
 	}()
+
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt)
 
 	in := bufio.NewReader(os.Stdin)
 	_, err = in.ReadString('\n')
