@@ -3,7 +3,7 @@
 [![baby-gopher](https://raw2.github.com/drnic/babygopher-site/gh-pages/images/babygopher-badge.png)](http://www.babygopher.org)
 
 `lmk` is a simple command line tool written in Go that draws your attention to
-a terminal when another command finishes.
+a terminal when another command finishes running.
 
 
 ## WTF?!?
