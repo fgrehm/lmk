@@ -22,7 +22,7 @@ usually Alt+Tab to check my emails or twitter and many times I get side tracked
 before realizing that I should have been doing something else.
 
 
-## Ok, so how does it work?
+## How does it work?
 
 Let's say you want to run the specs for that legacy project you have just been
 assigned and the full run takes 5 minutes to complete. With `lmk` you can run
