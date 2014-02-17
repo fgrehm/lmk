@@ -1,7 +1,5 @@
 # Let me know
 
-**:warning: WORK IN PROGRESS :warning:**
-
 [![baby-gopher](https://raw2.github.com/drnic/babygopher-site/gh-pages/images/babygopher-badge.png)](http://www.babygopher.org)
 
 `lmk` is a simple command line tool written in Go that draws your attention to
