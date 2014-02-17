@@ -55,7 +55,7 @@ version 1.2 or higher, and run `go install github.com/fgrehm/lmk`
 
 ## Usage
 
-```sh
+```
 Usage: lmk [options...] command
 
 Options:
