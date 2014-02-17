@@ -34,10 +34,6 @@ the keyboard? Well, in that case `lmk` will keep letting you know that the
 command finished every 30 seconds until you go back to the terminal session that
 you left the command running and hit Enter.
 
-```
-TODO: Record gif "movie"
-```
-
 
 ## Installation
 
