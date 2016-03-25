@@ -1,0 +1,13 @@
+language: go
+go:
+- 1.6
+script: make xbuild
+deploy:
+  provider: releases
+  api_key:
+    secure: DjCQ8z+9plW4ed6sJVCDMrtdS3zjp/amxNq/iEAu5XmkgrPfaSt5hzYofUNpBvRj1Z2+/vfbqncz3Kc6DonpKt1gv5s4RiIt6kh8qnk97SfvHyXBCjAFDPgFKOzdZacgZBIFpNTtscYsZOtIeoBPuw2oSAVVvXAFG4pz6FBwfKE=
+  file:
+  - 'build/lmk_linux_amd64'
+  - 'build/lmk_darwin_amd64'
+  on:
+    tags: true
