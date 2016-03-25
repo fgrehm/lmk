@@ -35,15 +35,18 @@ you left the command running and hit Enter.
 
 ## Installation
 
-### Standalone
+### Binary releases
 
 `lmk` can be easily installed as an executable. Download the latest [compiled
-binary forms of lmk](https://github.com/fgrehm/lmk/releases) for Linux and Darwin.
+binary forms of lmk](https://github.com/fgrehm/lmk/releases) for Linux and Darwin
+and drop it somewhere in your `$PATH`.
 
-### Source
+### Homebrew
 
-To install `lmk` from source, you need to have a [Go development environment](http://golang.org/doc/install),
-version 1.2 or higher, and run `go install github.com/fgrehm/lmk`
+```sh
+brew tap fgrehm/lmk
+brew install lmk
+```
 
 
 ## Usage
@@ -55,26 +58,10 @@ Options:
   -m  Message to display in case of success, defaults to "[command] has completed successfully"
 ```
 
-### Linux
+### Dependencies
 
-Since most Linux distributions have `notify-send` pre-installed, everything
-should work out of the box. If not, please [let me know](https://github.com/fgrehm/lmk/issues/new).
-
-### OS X
-
-You will need to create a `notify-send` script, available on `$PATH`. The script can forward the message to either
-[Growl](http://growl.info/) with [GrowlNotify](http://growl.info/downloads) (version 1.2.2 is free but unreliable)
-or to the [Notification Center](http://support.apple.com/kb/HT5362) available on OS X 10.8+
-using f.ex. [terminal-notifier](https://github.com/alloy/terminal-notifier).
-
-A (too) primitive script integrating with Growl:
-
-```bash
-#!/bin/bash
-growlnotify -t "Heads up!" -m "$*"
-```
-
-[![baby-gopher](https://raw2.github.com/drnic/babygopher-site/gh-pages/images/babygopher-badge.png)](http://www.babygopher.org)
+- Linux: `notify-send`
+- OSX: `osascript`
 
 
 ## Contributing
