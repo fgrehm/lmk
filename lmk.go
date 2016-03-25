@@ -2,12 +2,13 @@ package main
 
 import (
 	"bufio"
-	"fmt"
 	"flag"
+	"fmt"
 	"log"
 	"os"
 	"os/exec"
 	"os/signal"
+	"runtime"
 	"time"
 )
 
@@ -43,7 +44,7 @@ func main() {
 	waitForEnter()
 }
 
-func run (executable string, args ...string) error {
+func run(executable string, args ...string) error {
 	cmd := exec.Command(executable, args...)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
@@ -95,7 +96,13 @@ func startNotificationLoop(icon, msg string) {
 	go func() {
 		for {
 			log.Print("Notifying")
-			exec.Command("notify-send", "-i", icon, "--", "Heads up!", msg).Run()
+			if runtime.GOOS == "linux" {
+				exec.Command("notify-send", "-i", icon, "--", "Heads up!", msg).Run()
+			} else {
+				osascriptStmt := fmt.Sprintf("display notification \"%s\" with title \"Heads up!\"", msg)
+				exec.Command("osascript", "-e", osascriptStmt).Run()
+			}
+
 			time.Sleep(time.Second * 30)
 		}
 	}()
