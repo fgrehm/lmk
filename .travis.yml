@@ -1,6 +1,6 @@
 language: go
 go:
-- 1.6
+- 1.12.1
 script: make xbuild
 deploy:
   provider: releases
