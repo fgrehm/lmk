@@ -29,17 +29,24 @@ func main() {
 		fmt.Fprint(os.Stderr, usage)
 	}
 	flag.Parse()
-	if flag.NArg() < 1 {
-		usageAndExit("")
-	}
-
 	cmd := flag.Args()
 
-	executable, args := getExecutableAndArgs(cmd)
-	log.Printf("Running %s", cmd)
-	err := run(executable, args...)
+	var icon, msg string
+	if len(cmd) > 0 {
+		executable, args := getExecutableAndArgs(cmd)
+		log.Printf("Running %s", cmd)
+		err := run(executable, args...)
+		icon, msg = getIconAndMessage(err, cmd)
+	} else {
+		log.Print("Nothing to run, waiting for enter")
+		icon = "emblem-default"
+		if *flagMessage != "" {
+			msg = *flagMessage
+		} else {
+			msg = "Take a look at your terminal"
+		}
+	}
 
-	icon, msg := getIconAndMessage(err, cmd)
 	startNotificationLoop(icon, msg)
 	waitForEnter()
 }
