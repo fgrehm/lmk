@@ -1,0 +1,27 @@
+# Build artifacts
+lmk
+build/
+dist/
+
+# Test coverage
+coverage.txt
+*.out
+
+# Git
+.git/
+.gitignore
+
+# Documentation
+*.md
+LICENSE
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
