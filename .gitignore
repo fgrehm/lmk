@@ -1,2 +1,9 @@
 /lmk
+lmk.exe
 /build/*
+/dist/*
+/vendor/
+coverage.txt
+*.test
+*.out
+.claude/settings.local.json

@@ -1,0 +1,16 @@
+{
+  "includeCoAuthoredBy": false,
+  "permissions": {
+    "allow": [
+      "Bash(go version:*)",
+      "Bash(go build:*)",
+      "Bash(go mod vendor:*)",
+      "Bash(./lmk -version:*)",
+      "Bash(make build:*)",
+      "Bash(go test:*)",
+      "Bash(make xbuild:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
