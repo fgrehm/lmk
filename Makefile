@@ -11,7 +11,7 @@ help:
 	@echo "  build     Build lmk for current platform (default)"
 	@echo "  test      Run all tests with race detection and coverage"
 	@echo "  clean     Remove build artifacts and coverage files"
-	@echo "  install   Symlink lmk to ~/.local/bin (run 'make build' first)"
+	@echo "  install   Build and symlink lmk to ~/.local/bin"
 	@echo "  xbuild    Cross-compile for all platforms (Linux/macOS/Windows × amd64/arm64)"
 	@echo "  lint      Run golangci-lint (requires golangci-lint installed)"
 	@echo "  help      Show this help message"
@@ -25,7 +25,7 @@ test:
 clean:
 	rm -rf lmk build/ dist/ coverage.txt
 
-install:
+install: build
 	@mkdir -p ~/.local/bin
 	@ln -sf $(PWD)/lmk ~/.local/bin/lmk
 	@echo "Symlinked $(PWD)/lmk -> ~/.local/bin/lmk"
