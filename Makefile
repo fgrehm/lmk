@@ -39,7 +39,7 @@ docker-image:
 
 # Main build target using Docker
 build: docker-image
-	$(DOCKER_RUN) go build -v -ldflags="-s -w" -o lmk .
+	$(DOCKER_RUN) go build -v -ldflags="-s -w" -buildvcs=false -o lmk .
 
 # Build Docker image with binary
 docker-build:
@@ -75,17 +75,17 @@ local-install:
 xbuild: docker-image
 	@mkdir -p build
 	@echo "Building for Linux amd64..."
-	$(DOCKER_RUN) sh -c "GOOS=linux GOARCH=amd64 go build -ldflags='-s -w' -o build/lmk-linux-amd64 ."
+	$(DOCKER_RUN) sh -c "GOOS=linux GOARCH=amd64 go build -ldflags='-s -w' -buildvcs=false -o build/lmk-linux-amd64 ."
 	@echo "Building for Linux arm64..."
-	$(DOCKER_RUN) sh -c "GOOS=linux GOARCH=arm64 go build -ldflags='-s -w' -o build/lmk-linux-arm64 ."
+	$(DOCKER_RUN) sh -c "GOOS=linux GOARCH=arm64 go build -ldflags='-s -w' -buildvcs=false -o build/lmk-linux-arm64 ."
 	@echo "Building for macOS amd64..."
-	$(DOCKER_RUN) sh -c "GOOS=darwin GOARCH=amd64 go build -ldflags='-s -w' -o build/lmk-darwin-amd64 ."
+	$(DOCKER_RUN) sh -c "GOOS=darwin GOARCH=amd64 go build -ldflags='-s -w' -buildvcs=false -o build/lmk-darwin-amd64 ."
 	@echo "Building for macOS arm64..."
-	$(DOCKER_RUN) sh -c "GOOS=darwin GOARCH=arm64 go build -ldflags='-s -w' -o build/lmk-darwin-arm64 ."
+	$(DOCKER_RUN) sh -c "GOOS=darwin GOARCH=arm64 go build -ldflags='-s -w' -buildvcs=false -o build/lmk-darwin-arm64 ."
 	@echo "Building for Windows amd64..."
-	$(DOCKER_RUN) sh -c "GOOS=windows GOARCH=amd64 go build -ldflags='-s -w' -o build/lmk-windows-amd64.exe ."
+	$(DOCKER_RUN) sh -c "GOOS=windows GOARCH=amd64 go build -ldflags='-s -w' -buildvcs=false -o build/lmk-windows-amd64.exe ."
 	@echo "Building for Windows arm64..."
-	$(DOCKER_RUN) sh -c "GOOS=windows GOARCH=arm64 go build -ldflags='-s -w' -o build/lmk-windows-arm64.exe ."
+	$(DOCKER_RUN) sh -c "GOOS=windows GOARCH=arm64 go build -ldflags='-s -w' -buildvcs=false -o build/lmk-windows-arm64.exe ."
 	@echo 'DONE'
 
 # Local cross-compilation (without Docker)
