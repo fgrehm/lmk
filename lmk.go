@@ -412,8 +412,17 @@ func processHookPayload() {
 	icon := getNotificationIcon(payload.NotificationType)
 	log.Printf("[claude-hooks] Using icon: %s", icon)
 
-	// Format message
-	msg := fmt.Sprintf("%s Claude Code\n\n%s", icon, payload.Message)
+	// Extract project name from cwd
+	projectName := extractProjectName(payload.Cwd)
+	log.Printf("[claude-hooks] Project: %s (from cwd: %s)", projectName, payload.Cwd)
+
+	// Format message with project context
+	var msg string
+	if projectName != "" {
+		msg = fmt.Sprintf("%s Claude Code\nProject: %s\n\n%s", icon, projectName, payload.Message)
+	} else {
+		msg = fmt.Sprintf("%s Claude Code\n\n%s", icon, payload.Message)
+	}
 
 	// Claude Code hooks need immediate feedback - disable delay
 	os.Setenv("LMK_DELAY", "0s")
@@ -422,6 +431,30 @@ func processHookPayload() {
 	// Show dialog (notifications are informational, not errors)
 	showDialog(msg, false)
 	log.Printf("[claude-hooks] Dialog completed")
+}
+
+// extractProjectName gets the project name from the cwd path
+func extractProjectName(cwd string) string {
+	if cwd == "" {
+		return ""
+	}
+
+	// Normalize path separators (handle both Unix and Windows paths)
+	// This is needed because on Unix, filepath.Base won't recognize \ as separator
+	normalizedPath := strings.ReplaceAll(cwd, "\\", "/")
+	normalizedPath = strings.TrimSuffix(normalizedPath, "/")
+
+	// Get the last component
+	parts := strings.Split(normalizedPath, "/")
+	if len(parts) > 0 {
+		base := parts[len(parts)-1]
+		// Handle edge cases like root paths
+		if base == "" || base == "." {
+			return ""
+		}
+		return base
+	}
+	return ""
 }
 
 // setupClaudeHooksLogging configures logging to /tmp for debugging hooks

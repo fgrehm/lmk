@@ -275,3 +275,29 @@ func TestGetClaudeSettingsPath(t *testing.T) {
 		}
 	})
 }
+
+// TestExtractProjectName tests project name extraction from cwd
+func TestExtractProjectName(t *testing.T) {
+	tests := []struct {
+		name     string
+		cwd      string
+		expected string
+	}{
+		{"unix_path", "/home/user/projects/my-app", "my-app"},
+		{"nested_path", "/home/fabio/projects/oss/lmk", "lmk"},
+		{"windows_path", "C:\\Users\\john\\projects\\web-app", "web-app"},
+		{"trailing_slash", "/home/user/my-project/", "my-project"},
+		{"root_path", "/", ""},
+		{"empty_cwd", "", ""},
+		{"single_component", "project", "project"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := extractProjectName(tt.cwd)
+			if result != tt.expected {
+				t.Errorf("extractProjectName(%q) = %q, want %q", tt.cwd, result, tt.expected)
+			}
+		})
+	}
+}
