@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Claude Code integration** - `lmk claude-hooks` subcommand for desktop notifications from Claude Code
+  - Modal dialogs when Claude needs your attention (permission prompts 🔐, idle alerts ⏱️, auth success ✅, etc.)
+  - Shows project name so you know which session needs attention
+  - Install with `lmk claude-hooks install` (project-local) or `--global` (all projects)
+  - Debug logging to `/tmp/lmk-claude-hooks.log` for troubleshooting
+  - Filter by notification type: `--type permission_prompt,idle_prompt`
+  - `--dry-run` to preview changes, `--uninstall` to remove hooks
+
 ## [2.0.0] - 2025-11-17
 
 **🤖 This release was brought to you by Claude Sonnet 4.5**
