@@ -1,8 +1,10 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"os/exec"
@@ -48,6 +50,13 @@ func main() {
 	if *flagVersion {
 		fmt.Printf("lmk version %s\n", version)
 		os.Exit(0)
+	}
+
+	// Check for claude-hooks subcommand
+	args := flag.Args()
+	if len(args) > 0 && args[0] == "claude-hooks" {
+		handleClaudeHooks(args[1:])
+		return
 	}
 
 	// Handle timer mode
@@ -308,4 +317,303 @@ func showNotificationAndWait(msg string, isError bool) {
 
 	fmt.Println("\nPress Enter to dismiss...")
 	fmt.Scanln()
+}
+
+// ClaudeHookPayload represents the JSON payload from Claude Code hooks
+type ClaudeHookPayload struct {
+	SessionID        string `json:"session_id"`
+	TranscriptPath   string `json:"transcript_path"`
+	Cwd              string `json:"cwd"`
+	PermissionMode   string `json:"permission_mode"`
+	HookEventName    string `json:"hook_event_name"`
+	Message          string `json:"message"`
+	NotificationType string `json:"notification_type"`
+}
+
+// ClaudeSettings represents Claude Code settings file structure
+type ClaudeSettings struct {
+	Hooks *ClaudeHooks `json:"hooks,omitempty"`
+}
+
+// ClaudeHooks represents the hooks section of Claude settings
+type ClaudeHooks struct {
+	Notification []NotificationHook `json:"Notification,omitempty"`
+}
+
+// NotificationHook represents a single notification hook configuration
+type NotificationHook struct {
+	Matcher string       `json:"matcher,omitempty"`
+	Hooks   []HookConfig `json:"hooks"`
+}
+
+// HookConfig represents a hook command configuration
+type HookConfig struct {
+	Type    string `json:"type"`
+	Command string `json:"command"`
+}
+
+// handleClaudeHooks processes Claude Code hook events from stdin or handles install subcommand
+func handleClaudeHooks(args []string) {
+	// Check for install subcommand
+	if len(args) > 0 && args[0] == "install" {
+		installClaudeHooks(args[1:])
+		return
+	}
+
+	// Otherwise, process hook payload from stdin
+	processHookPayload()
+}
+
+// processHookPayload reads and processes a hook payload from stdin
+func processHookPayload() {
+	// Read JSON from stdin
+	data, err := io.ReadAll(os.Stdin)
+	if err != nil {
+		log.Fatalf("Error reading stdin: %v", err)
+	}
+
+	// Parse JSON
+	var payload ClaudeHookPayload
+	if err := json.Unmarshal(data, &payload); err != nil {
+		log.Fatalf("Error parsing JSON: %v", err)
+	}
+
+	// Validate required fields
+	if payload.NotificationType == "" {
+		log.Fatalf("Missing required field: notification_type")
+	}
+	if payload.Message == "" {
+		log.Fatalf("Missing required field: message")
+	}
+
+	// Get icon based on notification type
+	icon := getNotificationIcon(payload.NotificationType)
+
+	// Format message
+	msg := fmt.Sprintf("%s Claude Code\n\n%s", icon, payload.Message)
+
+	// Claude Code hooks need immediate feedback - disable delay
+	os.Setenv("LMK_DELAY", "0s")
+
+	// Show dialog (notifications are informational, not errors)
+	showDialog(msg, false)
+}
+
+// getNotificationIcon returns an emoji icon for the notification type
+func getNotificationIcon(notificationType string) string {
+	switch notificationType {
+	case "permission_prompt":
+		return "🔐"
+	case "idle_prompt":
+		return "⏱️"
+	case "auth_success":
+		return "✅"
+	case "elicitation_dialog":
+		return "📝"
+	default:
+		return "🤖"
+	}
+}
+
+// installClaudeHooks handles the install subcommand
+func installClaudeHooks(args []string) {
+	// Parse install flags
+	installFlags := flag.NewFlagSet("install", flag.ExitOnError)
+	global := installFlags.Bool("global", false, "Install to ~/.claude/settings.json instead of project-local")
+	typesStr := installFlags.String("type", "", "Comma-separated list of notification types to install")
+	uninstall := installFlags.Bool("uninstall", false, "Remove lmk hooks from configuration")
+	dryRun := installFlags.Bool("dry-run", false, "Show what would be changed without modifying files")
+
+	installFlags.Parse(args)
+
+	// Parse types if provided
+	var types []string
+	if *typesStr != "" {
+		types = strings.Split(*typesStr, ",")
+		// Validate types
+		validTypes := map[string]bool{
+			"permission_prompt":  true,
+			"idle_prompt":        true,
+			"auth_success":       true,
+			"elicitation_dialog": true,
+		}
+		for _, t := range types {
+			t = strings.TrimSpace(t)
+			if !validTypes[t] {
+				log.Fatalf("Invalid notification type: %s\nValid types: permission_prompt, idle_prompt, auth_success, elicitation_dialog", t)
+			}
+		}
+	}
+
+	// Get settings file path
+	settingsPath := getClaudeSettingsPath(*global)
+
+	// Read or create settings
+	settings := readOrCreateSettings(settingsPath)
+
+	if *uninstall {
+		// Remove lmk hooks
+		settings.Hooks = removeLmkHooks(settings.Hooks)
+	} else {
+		// Build lmk hook configuration
+		command := "lmk claude-hooks"
+		if *typesStr != "" {
+			command += " --type " + *typesStr
+		}
+
+		lmkHook := NotificationHook{
+			Hooks: []HookConfig{
+				{Type: "command", Command: command},
+			},
+		}
+
+		// Add or update
+		settings.Hooks = addOrUpdateLmkHook(settings.Hooks, lmkHook)
+	}
+
+	// Write back to file
+	if !*dryRun {
+		if err := writeSettings(settingsPath, settings); err != nil {
+			log.Fatalf("Failed to write settings: %v", err)
+		}
+	}
+
+	// Report success
+	printInstallSummary(settingsPath, types, *uninstall, *dryRun)
+}
+
+// getClaudeSettingsPath returns the path to the Claude settings file
+func getClaudeSettingsPath(global bool) string {
+	if global {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			log.Fatalf("Failed to get home directory: %v", err)
+		}
+		return fmt.Sprintf("%s/.claude/settings.json", home)
+	}
+	return ".claude/settings.local.json"
+}
+
+// readOrCreateSettings reads existing settings or creates empty structure
+func readOrCreateSettings(path string) ClaudeSettings {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			// Create empty settings
+			return ClaudeSettings{}
+		}
+		log.Fatalf("Failed to read settings file: %v", err)
+	}
+
+	var settings ClaudeSettings
+	if err := json.Unmarshal(data, &settings); err != nil {
+		log.Fatalf("Failed to parse settings file: %v", err)
+	}
+
+	return settings
+}
+
+// writeSettings writes settings to file with proper formatting
+func writeSettings(path string, settings ClaudeSettings) error {
+	// Ensure directory exists
+	dir := fmt.Sprintf("%s", path[:strings.LastIndex(path, "/")])
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return fmt.Errorf("failed to create directory: %w", err)
+	}
+
+	// Marshal with indentation
+	data, err := json.MarshalIndent(settings, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal settings: %w", err)
+	}
+
+	// Write to file
+	if err := os.WriteFile(path, data, 0644); err != nil {
+		return fmt.Errorf("failed to write file: %w", err)
+	}
+
+	return nil
+}
+
+// removeLmkHooks removes lmk hooks from the configuration
+func removeLmkHooks(hooks *ClaudeHooks) *ClaudeHooks {
+	if hooks == nil {
+		return nil
+	}
+
+	var filtered []NotificationHook
+	for _, hook := range hooks.Notification {
+		// Keep hooks that don't have lmk command
+		hasLmk := false
+		for _, h := range hook.Hooks {
+			if strings.Contains(h.Command, "lmk claude-hooks") {
+				hasLmk = true
+				break
+			}
+		}
+		if !hasLmk {
+			filtered = append(filtered, hook)
+		}
+	}
+
+	if len(filtered) == 0 {
+		return nil
+	}
+
+	return &ClaudeHooks{Notification: filtered}
+}
+
+// addOrUpdateLmkHook adds or updates the lmk hook in the configuration
+func addOrUpdateLmkHook(hooks *ClaudeHooks, lmkHook NotificationHook) *ClaudeHooks {
+	if hooks == nil {
+		hooks = &ClaudeHooks{}
+	}
+
+	// Remove existing lmk hooks first
+	hooks = removeLmkHooks(hooks)
+	if hooks == nil {
+		hooks = &ClaudeHooks{}
+	}
+
+	// Add new lmk hook
+	hooks.Notification = append(hooks.Notification, lmkHook)
+
+	return hooks
+}
+
+// printInstallSummary prints a summary of the installation
+func printInstallSummary(path string, types []string, uninstall bool, dryRun bool) {
+	if dryRun {
+		fmt.Println("🔍 Dry run mode - no files were modified")
+		fmt.Println()
+	}
+
+	if uninstall {
+		if dryRun {
+			fmt.Printf("Would remove lmk hooks from: %s\n", path)
+		} else {
+			fmt.Println("✅ Claude Code hooks uninstalled successfully!")
+			fmt.Println()
+			fmt.Printf("Configuration updated: %s\n", path)
+		}
+	} else {
+		if dryRun {
+			fmt.Printf("Would install lmk hooks to: %s\n", path)
+		} else {
+			fmt.Println("✅ Claude Code hooks installed successfully!")
+			fmt.Println()
+			fmt.Printf("Configuration updated: %s\n", path)
+		}
+		fmt.Println()
+		fmt.Println("Installed hooks:")
+		if len(types) > 0 {
+			fmt.Printf("  - Notification (types: %s)\n", strings.Join(types, ", "))
+		} else {
+			fmt.Println("  - Notification (all types)")
+		}
+		fmt.Println()
+		fmt.Println("Command: lmk claude-hooks")
+		fmt.Println()
+		fmt.Println("To test: Start a new Claude Code session and trigger a notification")
+	}
 }

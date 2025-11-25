@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "Notification": [
+      {
+        "matcher": "other_type",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "some-other-tool"
+          }
+        ]
+      }
+    ]
+  }
+}

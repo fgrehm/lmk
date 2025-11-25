@@ -1,0 +1,14 @@
+{
+  "hooks": {
+    "Notification": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "lmk claude-hooks"
+          }
+        ]
+      }
+    ]
+  }
+}
