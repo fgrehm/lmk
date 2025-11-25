@@ -344,9 +344,8 @@ type ClaudeHookPayload struct {
 }
 
 // ClaudeSettings represents Claude Code settings file structure
-type ClaudeSettings struct {
-	Hooks *ClaudeHooks `json:"hooks,omitempty"`
-}
+// Uses map to preserve all existing settings we don't know about
+type ClaudeSettings map[string]interface{}
 
 // ClaudeHooks represents the hooks section of Claude settings
 type ClaudeHooks struct {
@@ -535,9 +534,20 @@ func installClaudeHooks(args []string) {
 	// Read or create settings
 	settings := readOrCreateSettings(settingsPath)
 
+	// Get current hooks (if any)
+	var currentHooks *ClaudeHooks
+	if hooksData, ok := settings["hooks"]; ok {
+		// Re-marshal and unmarshal to convert from map to struct
+		hooksJSON, _ := json.Marshal(hooksData)
+		var hooks ClaudeHooks
+		if err := json.Unmarshal(hooksJSON, &hooks); err == nil {
+			currentHooks = &hooks
+		}
+	}
+
 	if *uninstall {
 		// Remove lmk hooks
-		settings.Hooks = removeLmkHooks(settings.Hooks)
+		currentHooks = removeLmkHooks(currentHooks)
 	} else {
 		// Get full path to lmk executable
 		lmkPath, err := os.Executable()
@@ -558,7 +568,14 @@ func installClaudeHooks(args []string) {
 		}
 
 		// Add or update
-		settings.Hooks = addOrUpdateLmkHook(settings.Hooks, lmkHook)
+		currentHooks = addOrUpdateLmkHook(currentHooks, lmkHook)
+	}
+
+	// Update settings map with new hooks
+	if currentHooks == nil {
+		delete(settings, "hooks")
+	} else {
+		settings["hooks"] = currentHooks
 	}
 
 	// Write back to file
@@ -597,15 +614,20 @@ func readOrCreateSettings(path string) ClaudeSettings {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			// Create empty settings
-			return ClaudeSettings{}
+			// Create empty settings map
+			return make(ClaudeSettings)
 		}
 		log.Fatalf("Failed to read settings file: %v", err)
 	}
 
+	// Use map to preserve all existing settings
 	var settings ClaudeSettings
 	if err := json.Unmarshal(data, &settings); err != nil {
 		log.Fatalf("Failed to parse settings file: %v", err)
+	}
+
+	if settings == nil {
+		settings = make(ClaudeSettings)
 	}
 
 	return settings

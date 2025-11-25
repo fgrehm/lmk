@@ -69,25 +69,25 @@ func TestClaudeHookPayloadParsing(t *testing.T) {
 func TestReadOrCreateSettings(t *testing.T) {
 	t.Run("read_existing_settings", func(t *testing.T) {
 		settings := readOrCreateSettings("testdata/existing_settings.json")
-		if settings.Hooks == nil {
+		if _, ok := settings["hooks"]; !ok {
 			t.Error("Expected hooks to be populated")
-		}
-		if len(settings.Hooks.Notification) == 0 {
-			t.Error("Expected notification hooks to exist")
 		}
 	})
 
 	t.Run("create_empty_settings", func(t *testing.T) {
 		settings := readOrCreateSettings("testdata/nonexistent_file.json")
-		if settings.Hooks != nil {
-			t.Error("Expected hooks to be nil for new settings")
+		if _, ok := settings["hooks"]; ok {
+			t.Error("Expected hooks to not exist for new settings")
+		}
+		if settings == nil {
+			t.Error("Expected empty map, not nil")
 		}
 	})
 
 	t.Run("read_empty_settings", func(t *testing.T) {
 		settings := readOrCreateSettings("testdata/empty_settings.json")
-		if settings.Hooks != nil {
-			t.Error("Expected hooks to be nil for empty settings")
+		if _, ok := settings["hooks"]; ok {
+			t.Error("Expected hooks to not exist for empty settings")
 		}
 	})
 }
@@ -213,16 +213,19 @@ func TestWriteAndReadSettings(t *testing.T) {
 	tempDir := t.TempDir()
 	settingsPath := filepath.Join(tempDir, ".claude", "settings.json")
 
-	settings := ClaudeSettings{
-		Hooks: &ClaudeHooks{
-			Notification: []NotificationHook{
-				{
-					Hooks: []HookConfig{
-						{Type: "command", Command: "lmk claude-hooks"},
-					},
+	settings := make(ClaudeSettings)
+	settings["hooks"] = &ClaudeHooks{
+		Notification: []NotificationHook{
+			{
+				Hooks: []HookConfig{
+					{Type: "command", Command: "lmk claude-hooks"},
 				},
 			},
 		},
+	}
+	settings["someOtherSetting"] = "should be preserved"
+	settings["anotherField"] = map[string]interface{}{
+		"nested": "value",
 	}
 
 	// Write settings
@@ -238,12 +241,18 @@ func TestWriteAndReadSettings(t *testing.T) {
 	// Read back settings
 	readSettings := readOrCreateSettings(settingsPath)
 
-	// Verify contents
-	if readSettings.Hooks == nil {
+	// Verify hooks were preserved
+	if _, ok := readSettings["hooks"]; !ok {
 		t.Fatal("Expected hooks to be populated")
 	}
-	if len(readSettings.Hooks.Notification) != 1 {
-		t.Errorf("Expected 1 notification hook, got %d", len(readSettings.Hooks.Notification))
+
+	// Verify other settings were preserved
+	if val, ok := readSettings["someOtherSetting"]; !ok || val != "should be preserved" {
+		t.Error("Expected other settings to be preserved")
+	}
+
+	if _, ok := readSettings["anotherField"]; !ok {
+		t.Error("Expected nested field to be preserved")
 	}
 
 	// Verify JSON formatting
