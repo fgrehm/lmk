@@ -506,8 +506,14 @@ func installClaudeHooks(args []string) {
 		// Remove lmk hooks
 		settings.Hooks = removeLmkHooks(settings.Hooks)
 	} else {
-		// Build lmk hook configuration
-		command := "lmk claude-hooks"
+		// Get full path to lmk executable
+		lmkPath, err := os.Executable()
+		if err != nil {
+			log.Fatalf("Failed to get lmk executable path: %v", err)
+		}
+
+		// Build lmk hook configuration with full path
+		command := lmkPath + " claude-hooks"
 		if *typesStr != "" {
 			command += " --type " + *typesStr
 		}
@@ -530,7 +536,15 @@ func installClaudeHooks(args []string) {
 	}
 
 	// Report success
-	printInstallSummary(settingsPath, types, *uninstall, *dryRun)
+	commandPreview := ""
+	if !*uninstall {
+		lmkPath, _ := os.Executable()
+		commandPreview = lmkPath + " claude-hooks"
+		if *typesStr != "" {
+			commandPreview += " --type " + *typesStr
+		}
+	}
+	printInstallSummary(settingsPath, types, *uninstall, *dryRun, commandPreview)
 }
 
 // getClaudeSettingsPath returns the path to the Claude settings file
@@ -633,7 +647,7 @@ func addOrUpdateLmkHook(hooks *ClaudeHooks, lmkHook NotificationHook) *ClaudeHoo
 }
 
 // printInstallSummary prints a summary of the installation
-func printInstallSummary(path string, types []string, uninstall bool, dryRun bool) {
+func printInstallSummary(path string, types []string, uninstall bool, dryRun bool, command string) {
 	if dryRun {
 		fmt.Println("🔍 Dry run mode - no files were modified")
 		fmt.Println()
@@ -663,7 +677,11 @@ func printInstallSummary(path string, types []string, uninstall bool, dryRun boo
 			fmt.Println("  - Notification (all types)")
 		}
 		fmt.Println()
-		fmt.Println("Command: lmk claude-hooks")
+		if command != "" {
+			fmt.Printf("Command: %s\n", command)
+		} else {
+			fmt.Println("Command: lmk claude-hooks")
+		}
 		fmt.Println()
 		fmt.Println("To test: Start a new Claude Code session and trigger a notification")
 		fmt.Println()
