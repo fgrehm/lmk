@@ -24,16 +24,29 @@ var (
 
 var usage = `Usage: lmk [options...] command
    or: lmk -t <duration> [-m <text>]
+   or: lmk claude-hooks [install [options]]
 
 Options:
   -m            Message to display in case of success, defaults to "[command] has completed successfully"
   -t, -timer    Timer duration (e.g., 25m, 1h30m, 90s) - runs a countdown timer instead of a command
   -version      Show version information
 
+Subcommands:
+  claude-hooks           Process Claude Code notification hooks (reads JSON from stdin)
+  claude-hooks install   Install lmk hooks into Claude Code settings
+    --global               Install to ~/.claude/settings.json (default: .claude/settings.local.json)
+    --type TYPES           Only install for specific notification types (comma-separated)
+    --uninstall            Remove lmk hooks from configuration
+    --dry-run              Show what would be changed without modifying files
+
 Examples:
-  lmk npm test                          Run command and notify when done
-  lmk -t 25m -m "Pomodoro done!"       25 minute timer
-  lmk -t 5m -m "Break over!"           5 minute break timer
+  lmk npm test                                    Run command and notify when done
+  lmk -t 25m -m "Pomodoro done!"                 25 minute timer
+  lmk -t 5m -m "Break over!"                     5 minute break timer
+  lmk claude-hooks install                        Install Claude Code hooks (project-local)
+  lmk claude-hooks install --global               Install Claude Code hooks (globally)
+  lmk claude-hooks install --type permission_prompt,idle_prompt
+                                                  Install hooks for specific notification types
 `
 
 func init() {
