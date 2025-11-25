@@ -379,28 +379,38 @@ func handleClaudeHooks(args []string) {
 
 // processHookPayload reads and processes a hook payload from stdin
 func processHookPayload() {
+	// Setup logging for debugging hooks
+	logFile := setupClaudeHooksLogging()
+	if logFile != nil {
+		defer logFile.Close()
+		log.Printf("[claude-hooks] Starting hook processing")
+	}
+
 	// Read JSON from stdin
 	data, err := io.ReadAll(os.Stdin)
 	if err != nil {
-		log.Fatalf("Error reading stdin: %v", err)
+		log.Fatalf("[claude-hooks] Error reading stdin: %v", err)
 	}
+	log.Printf("[claude-hooks] Read %d bytes from stdin", len(data))
 
 	// Parse JSON
 	var payload ClaudeHookPayload
 	if err := json.Unmarshal(data, &payload); err != nil {
-		log.Fatalf("Error parsing JSON: %v", err)
+		log.Fatalf("[claude-hooks] Error parsing JSON: %v\nRaw data: %s", err, string(data))
 	}
+	log.Printf("[claude-hooks] Parsed payload: type=%s, message=%s", payload.NotificationType, payload.Message)
 
 	// Validate required fields
 	if payload.NotificationType == "" {
-		log.Fatalf("Missing required field: notification_type")
+		log.Fatalf("[claude-hooks] Missing required field: notification_type")
 	}
 	if payload.Message == "" {
-		log.Fatalf("Missing required field: message")
+		log.Fatalf("[claude-hooks] Missing required field: message")
 	}
 
 	// Get icon based on notification type
 	icon := getNotificationIcon(payload.NotificationType)
+	log.Printf("[claude-hooks] Using icon: %s", icon)
 
 	// Format message
 	msg := fmt.Sprintf("%s Claude Code\n\n%s", icon, payload.Message)
@@ -408,8 +418,36 @@ func processHookPayload() {
 	// Claude Code hooks need immediate feedback - disable delay
 	os.Setenv("LMK_DELAY", "0s")
 
+	log.Printf("[claude-hooks] Showing dialog")
 	// Show dialog (notifications are informational, not errors)
 	showDialog(msg, false)
+	log.Printf("[claude-hooks] Dialog completed")
+}
+
+// setupClaudeHooksLogging configures logging to /tmp for debugging hooks
+func setupClaudeHooksLogging() *os.File {
+	// Allow disabling via env var
+	if os.Getenv("LMK_NO_LOG") != "" {
+		return nil
+	}
+
+	logPath := os.Getenv("LMK_LOG_PATH")
+	if logPath == "" {
+		logPath = "/tmp/lmk-claude-hooks.log"
+	}
+
+	logFile, err := os.OpenFile(logPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		// If we can't open log file, just continue without logging
+		// Don't want to break the hook if /tmp has issues
+		return nil
+	}
+
+	// Configure logger to write to file
+	log.SetOutput(logFile)
+	log.SetFlags(log.LstdFlags | log.Lmicroseconds)
+
+	return logFile
 }
 
 // getNotificationIcon returns an emoji icon for the notification type
@@ -628,5 +666,8 @@ func printInstallSummary(path string, types []string, uninstall bool, dryRun boo
 		fmt.Println("Command: lmk claude-hooks")
 		fmt.Println()
 		fmt.Println("To test: Start a new Claude Code session and trigger a notification")
+		fmt.Println()
+		fmt.Println("Debug: Hook events are logged to /tmp/lmk-claude-hooks.log")
+		fmt.Println("       Use 'tail -f /tmp/lmk-claude-hooks.log' to watch in real-time")
 	}
 }
