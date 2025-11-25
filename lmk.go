@@ -18,7 +18,7 @@ var (
 	flagTimer   string
 	flagVersion = flag.Bool("version", false, "")
 
-	version        = "2.0.0"
+	version        = "2.1.0"
 	defaultMessage = "%s has completed successfully"
 )
 
