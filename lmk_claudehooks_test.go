@@ -310,3 +310,231 @@ func TestExtractProjectName(t *testing.T) {
 		})
 	}
 }
+
+// TestInstallClaudeHooksPreservesOtherSettings tests that installation preserves other hooks and settings
+func TestInstallClaudeHooksPreservesOtherSettings(t *testing.T) {
+	t.Run("preserve_other_hook_types_and_notification_hooks", func(t *testing.T) {
+		tempDir := t.TempDir()
+		settingsPath := filepath.Join(tempDir, ".claude", "settings.json")
+
+		// Create settings with multiple hook types and multiple notification hooks
+		settings := make(ClaudeSettings)
+		settings["colorScheme"] = "dark"
+		settings["fontSize"] = 12
+
+		// Multiple hook types (Notification and Completion)
+		hooksMap := map[string]interface{}{
+			"Notification": []map[string]interface{}{
+				{
+					"matcher": "permission_prompt",
+					"hooks": []map[string]string{
+						{
+							"type":    "command",
+							"command": "other-tool notify",
+						},
+					},
+				},
+			},
+			"Completion": []map[string]interface{}{
+				{
+					"hooks": []map[string]string{
+						{
+							"type":    "command",
+							"command": "completion-tool",
+						},
+					},
+				},
+			},
+			"SomeOtherHookType": "preserve-this-too",
+		}
+		settings["hooks"] = hooksMap
+
+		// Write initial settings
+		if err := writeSettings(settingsPath, settings); err != nil {
+			t.Fatalf("Failed to write settings: %v", err)
+		}
+
+		// Read settings back
+		readSettings := readOrCreateSettings(settingsPath)
+
+		// Verify other settings are present
+		if val, ok := readSettings["colorScheme"]; !ok || val != "dark" {
+			t.Error("Expected colorScheme setting to be preserved")
+		}
+		if val, ok := readSettings["fontSize"]; !ok || val != float64(12) {
+			t.Error("Expected fontSize setting to be preserved")
+		}
+
+		// Verify hooks map has all types
+		hooksData, ok := readSettings["hooks"]
+		if !ok {
+			t.Fatal("Expected hooks to exist")
+		}
+
+		hooksMapRead, ok := hooksData.(map[string]interface{})
+		if !ok {
+			t.Fatal("Expected hooks to be a map")
+		}
+
+		// Verify Completion hook type is preserved
+		if _, ok := hooksMapRead["Completion"]; !ok {
+			t.Error("Expected Completion hook type to be preserved")
+		}
+
+		// Verify other hook type is preserved
+		if _, ok := hooksMapRead["SomeOtherHookType"]; !ok {
+			t.Error("Expected SomeOtherHookType to be preserved")
+		}
+
+		// Verify Notification hooks are present (they should still be there)
+		if _, ok := hooksMapRead["Notification"]; !ok {
+			t.Error("Expected Notification hooks to be present")
+		}
+	})
+}
+
+// TestInstallClaudeHooksActualInstallation tests that installClaudeHooks actually installs hooks correctly
+func TestInstallClaudeHooksActualInstallation(t *testing.T) {
+	t.Run("install_lmk_hooks_and_preserve_other_settings", func(t *testing.T) {
+		tempDir := t.TempDir()
+		claudeDir := filepath.Join(tempDir, ".claude")
+		settingsPath := filepath.Join(claudeDir, "settings.local.json")
+
+		// Create initial settings with other hooks and settings
+		initialSettings := make(ClaudeSettings)
+		initialSettings["theme"] = "light"
+		initialSettings["editor"] = "vim"
+
+		// Add some existing hooks (including other notification hooks and other hook types)
+		hooksMap := map[string]interface{}{
+			"Notification": []map[string]interface{}{
+				{
+					"matcher": "idle_prompt",
+					"hooks": []map[string]string{
+						{
+							"type":    "command",
+							"command": "existing-notification-hook",
+						},
+					},
+				},
+			},
+			"Completion": []map[string]interface{}{
+				{
+					"hooks": []map[string]string{
+						{
+							"type":    "command",
+							"command": "completion-provider",
+						},
+					},
+				},
+			},
+		}
+		initialSettings["hooks"] = hooksMap
+
+		// Write initial settings
+		if err := writeSettings(settingsPath, initialSettings); err != nil {
+			t.Fatalf("Failed to write initial settings: %v", err)
+		}
+
+		// Change to temp directory so installClaudeHooks uses local settings
+		oldCwd, err := os.Getwd()
+		if err != nil {
+			t.Fatalf("Failed to get current directory: %v", err)
+		}
+		defer os.Chdir(oldCwd)
+
+		if err := os.Chdir(tempDir); err != nil {
+			t.Fatalf("Failed to chdir to temp directory: %v", err)
+		}
+
+		// Call installClaudeHooks with --ack-mode flag
+		installClaudeHooks([]string{"--ack-mode", "--dry-run"})
+
+		// Read back the settings (should not be modified due to --dry-run)
+		// So we need to actually do the install without --dry-run
+		installClaudeHooks([]string{"--ack-mode"})
+
+		// Read installed settings
+		installedSettings := readOrCreateSettings(settingsPath)
+
+		// Verify other settings are preserved
+		if val, ok := installedSettings["theme"]; !ok || val != "light" {
+			t.Error("Expected theme setting to be preserved")
+		}
+		if val, ok := installedSettings["editor"]; !ok || val != "vim" {
+			t.Error("Expected editor setting to be preserved")
+		}
+
+		// Verify hooks structure
+		hooksData, ok := installedSettings["hooks"]
+		if !ok {
+			t.Fatal("Expected hooks to exist after installation")
+		}
+
+		hooksMapRead, ok := hooksData.(map[string]interface{})
+		if !ok {
+			t.Fatal("Expected hooks to be a map")
+		}
+
+		// Verify Completion hooks are preserved
+		if _, ok := hooksMapRead["Completion"]; !ok {
+			t.Error("Expected Completion hook type to be preserved after lmk installation")
+		}
+
+		// Verify Notification hooks exist
+		notificationData, ok := hooksMapRead["Notification"]
+		if !ok {
+			t.Fatal("Expected Notification hooks after installation")
+		}
+
+		notificationHooks, ok := notificationData.([]interface{})
+		if !ok {
+			t.Fatal("Expected Notification to be a list")
+		}
+
+		// Should have at least 1 notification hook (the new lmk one)
+		if len(notificationHooks) < 1 {
+			t.Errorf("Expected at least 1 notification hook, got %d", len(notificationHooks))
+		}
+
+		// Verify lmk hook was added with --ack-mode
+		foundLmkHook := false
+		foundExistingHook := false
+
+		for _, hookInterface := range notificationHooks {
+			hook, ok := hookInterface.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			hooksArray, ok := hook["hooks"].([]interface{})
+			if !ok {
+				continue
+			}
+			for _, h := range hooksArray {
+				hConfig, ok := h.(map[string]interface{})
+				if !ok {
+					continue
+				}
+				cmd, ok := hConfig["command"].(string)
+				if !ok {
+					continue
+				}
+				// Check for lmk hook
+				if strings.Contains(cmd, "lmk") && strings.Contains(cmd, "claude-hooks") && strings.Contains(cmd, "--ack-mode") {
+					foundLmkHook = true
+				}
+				// Check for existing hook
+				if strings.Contains(cmd, "existing-notification-hook") {
+					foundExistingHook = true
+				}
+			}
+		}
+
+		if !foundLmkHook {
+			t.Error("Expected lmk hook with --ack-mode flag to be installed")
+		}
+		if !foundExistingHook {
+			t.Error("Expected existing notification hook to be preserved")
+		}
+	})
+}
