@@ -186,12 +186,30 @@ func formatDuration(d time.Duration) string {
 	return fmt.Sprintf("%dh %dm", int(d.Hours()), int(d.Minutes())%60)
 }
 
+// isAckModeSupported checks if ack mode is supported on this platform
+func isAckModeSupported() bool {
+	// Ack mode is currently only supported on Linux with yad
+	if runtime.GOOS != "linux" {
+		return false
+	}
+	_, err := exec.LookPath("yad")
+	return err == nil
+}
+
 func showDialog(msg string, isError bool, ackMode bool) {
 	// Dry-run mode for testing and debugging
 	if os.Getenv("LMK_DRY_RUN") != "" {
 		fmt.Fprintf(os.Stderr, "[DRY RUN] Dialog message: %s\n", msg)
 		fmt.Fprintf(os.Stderr, "[DRY RUN] Is error: %t\n", isError)
+		fmt.Fprintf(os.Stderr, "[DRY RUN] Ack mode: %t\n", ackMode)
 		return
+	}
+
+	// Check if ack mode is supported on this platform
+	if ackMode && !isAckModeSupported() {
+		log.Printf("Warning: Ack mode is only supported on Linux with yad installed")
+		log.Printf("Falling back to normal dialog mode")
+		ackMode = false
 	}
 
 	// Delay before showing dialog to prevent accidental dismissal

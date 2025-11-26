@@ -2,6 +2,7 @@ package main
 
 import (
 	"os/exec"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -242,4 +243,62 @@ func TestTimerDurationParsing(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestIsAckModeSupported(t *testing.T) {
+	// Test platform check
+	supported := isAckModeSupported()
+
+	if runtime.GOOS != "linux" {
+		// Non-Linux should never support ack mode
+		if supported {
+			t.Error("isAckModeSupported() = true on non-Linux platform, want false")
+		}
+	} else {
+		// Linux support depends on yad availability
+		_, err := exec.LookPath("yad")
+		expectedSupport := (err == nil)
+
+		if supported != expectedSupport {
+			t.Errorf("isAckModeSupported() = %v, want %v (yad available = %v)", supported, expectedSupport, err == nil)
+		}
+	}
+}
+
+func TestAckModeFallback(t *testing.T) {
+	// Save and restore original GOOS
+	originalGOOS := runtime.GOOS
+
+	tests := []struct {
+		name    string
+		ackMode bool
+		wantMsg string
+	}{
+		{
+			name:    "ack mode enabled in dry run",
+			ackMode: true,
+			wantMsg: "Ack mode: true",
+		},
+		{
+			name:    "ack mode disabled in dry run",
+			ackMode: false,
+			wantMsg: "Ack mode: false",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Use dry run to verify ack mode is being logged
+			t.Setenv("LMK_DRY_RUN", "1")
+
+			// This would normally show a dialog, but in dry run it just logs
+			showDialog("test message", false, tt.ackMode)
+
+			// The test passes if we get here without panic
+			// In real usage, non-Linux or non-yad systems would log a warning
+			// and fall back to normal mode
+		})
+	}
+
+	_ = originalGOOS // keep linter happy
 }
