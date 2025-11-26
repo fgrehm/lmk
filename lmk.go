@@ -38,6 +38,7 @@ Subcommands:
   claude-hooks install   Install lmk hooks into Claude Code settings
     --global               Install to ~/.claude/settings.json (default: .claude/settings.local.json)
     --type TYPES           Only install for specific notification types (comma-separated)
+    --ack-mode             Require explicit acknowledgment for claude hook dialogs
     --uninstall            Remove lmk hooks from configuration
     --dry-run              Show what would be changed without modifying files
 
@@ -424,11 +425,16 @@ func handleClaudeHooks(args []string) {
 	}
 
 	// Otherwise, process hook payload from stdin
-	processHookPayload()
+	// Parse flags for non-install case
+	hookFlags := flag.NewFlagSet("claude-hooks", flag.ContinueOnError)
+	ackMode := hookFlags.Bool("ack-mode", false, "")
+	hookFlags.Parse(args)
+
+	processHookPayload(*ackMode)
 }
 
 // processHookPayload reads and processes a hook payload from stdin
-func processHookPayload() {
+func processHookPayload(ackMode bool) {
 	// Setup logging for debugging hooks
 	logFile := setupClaudeHooksLogging()
 	if logFile != nil {
@@ -477,10 +483,9 @@ func processHookPayload() {
 	// Claude Code hooks need immediate feedback - disable delay
 	os.Setenv("LMK_DELAY", "0s")
 
-	log.Printf("[claude-hooks] Showing dialog")
+	log.Printf("[claude-hooks] Showing dialog (ack_mode=%v)", ackMode)
 	// Show dialog (notifications are informational, not errors)
-	// Claude hooks don't use ack mode
-	showDialog(msg, false, false)
+	showDialog(msg, false, ackMode)
 	log.Printf("[claude-hooks] Dialog completed")
 }
 
@@ -558,6 +563,7 @@ func installClaudeHooks(args []string) {
 	typesStr := installFlags.String("type", "", "Comma-separated list of notification types to install")
 	uninstall := installFlags.Bool("uninstall", false, "Remove lmk hooks from configuration")
 	dryRun := installFlags.Bool("dry-run", false, "Show what would be changed without modifying files")
+	ackMode := installFlags.Bool("ack-mode", false, "Require explicit acknowledgment with ack mode")
 
 	installFlags.Parse(args)
 
@@ -612,6 +618,9 @@ func installClaudeHooks(args []string) {
 		if *typesStr != "" {
 			command += " --type " + *typesStr
 		}
+		if *ackMode {
+			command += " --ack-mode"
+		}
 
 		lmkHook := NotificationHook{
 			Hooks: []HookConfig{
@@ -644,6 +653,9 @@ func installClaudeHooks(args []string) {
 		commandPreview = lmkPath + " claude-hooks"
 		if *typesStr != "" {
 			commandPreview += " --type " + *typesStr
+		}
+		if *ackMode {
+			commandPreview += " --ack-mode"
 		}
 	}
 	printInstallSummary(settingsPath, types, *uninstall, *dryRun, commandPreview)

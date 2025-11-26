@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0] - 2025-11-26
+
+### Added
+
+- **Ack mode** - `-a` / `--ack-mode` flag to require explicit acknowledgment
+  - Forces user to click "Ack" button to dismiss dialogs
+  - Clicking "Dismiss" (focused by default) re-shows the dialog with exponential backoff
+  - Backoff sequence: 5s → 10s → 20s → 40s → 60s (caps at 60s)
+  - Works with both command mode and timer mode
+  - Available on Linux/yad for now
+
+### Changed
+
+- **LMK_DELAY default** - Changed from 3s to 0s (immediate display)
+  - Environment variable still works as override if set
+
 ## [2.1.0] - 2025-11-25
 
 ### Added
