@@ -32,15 +32,15 @@ func TestFormatDuration(t *testing.T) {
 
 func TestGetExecutableAndArgs(t *testing.T) {
 	tests := []struct {
-		name          string
-		cmd           []string
+		name           string
+		cmd            []string
 		wantExecutable string
-		wantArgs      []string
-		wantError     bool
+		wantArgs       []string
+		wantError      bool
 	}{
 		{
-			name:          "echo with args",
-			cmd:           []string{"echo", "hello", "world"},
+			name: "echo with args",
+			cmd:  []string{"echo", "hello", "world"},
 			wantExecutable: func() string {
 				path, _ := exec.LookPath("echo")
 				return path
@@ -49,8 +49,8 @@ func TestGetExecutableAndArgs(t *testing.T) {
 			wantError: false,
 		},
 		{
-			name:          "single command",
-			cmd:           []string{"pwd"},
+			name: "single command",
+			cmd:  []string{"pwd"},
 			wantExecutable: func() string {
 				path, _ := exec.LookPath("pwd")
 				return path

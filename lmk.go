@@ -592,11 +592,16 @@ func installClaudeHooks(args []string) {
 	// Read or create settings
 	settings := readOrCreateSettings(settingsPath)
 
-	// Get current hooks (if any)
+	// Get current hooks, preserving any non-Notification hooks
+	hooksMap := make(map[string]interface{})
 	var currentHooks *ClaudeHooks
+
 	if hooksData, ok := settings["hooks"]; ok {
-		// Re-marshal and unmarshal to convert from map to struct
+		// Preserve the entire hooks map to keep non-Notification hook types
 		hooksJSON, _ := json.Marshal(hooksData)
+		json.Unmarshal(hooksJSON, &hooksMap)
+
+		// Also parse the Notification hooks
 		var hooks ClaudeHooks
 		if err := json.Unmarshal(hooksJSON, &hooks); err == nil {
 			currentHooks = &hooks
@@ -632,11 +637,19 @@ func installClaudeHooks(args []string) {
 		currentHooks = addOrUpdateLmkHook(currentHooks, lmkHook)
 	}
 
-	// Update settings map with new hooks
-	if currentHooks == nil {
-		delete(settings, "hooks")
+	// Update settings map with new notification hooks, preserving other hook types
+	if currentHooks == nil || len(currentHooks.Notification) == 0 {
+		// Remove Notification hooks but keep other hook types
+		delete(hooksMap, "Notification")
+		if len(hooksMap) == 0 {
+			delete(settings, "hooks")
+		} else {
+			settings["hooks"] = hooksMap
+		}
 	} else {
-		settings["hooks"] = currentHooks
+		// Update Notification hooks in the map
+		hooksMap["Notification"] = currentHooks.Notification
+		settings["hooks"] = hooksMap
 	}
 
 	// Write back to file
