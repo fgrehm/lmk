@@ -16,9 +16,10 @@ import (
 var (
 	flagMessage = flag.String("m", "", "")
 	flagTimer   string
+	flagAckMode = flag.Bool("a", false, "")
 	flagVersion = flag.Bool("version", false, "")
 
-	version        = "2.1.0"
+	version        = "2.2.0"
 	defaultMessage = "%s has completed successfully"
 )
 
@@ -27,9 +28,10 @@ var usage = `Usage: lmk [options...] command
    or: lmk claude-hooks [install [options]]
 
 Options:
-  -m            Message to display in case of success, defaults to "[command] has completed successfully"
-  -t, -timer    Timer duration (e.g., 25m, 1h30m, 90s) - runs a countdown timer instead of a command
-  -version      Show version information
+  -m                Message to display in case of success, defaults to "[command] has completed successfully"
+  -t, -timer        Timer duration (e.g., 25m, 1h30m, 90s) - runs a countdown timer instead of a command
+  -a, -ack-mode     Require explicit acknowledgment - user must click "Ack" button, dismisses re-show dialog
+  -version          Show version information
 
 Subcommands:
   claude-hooks           Process Claude Code notification hooks (reads JSON from stdin)
@@ -52,6 +54,7 @@ Examples:
 func init() {
 	flag.StringVar(&flagTimer, "t", "", "")
 	flag.StringVar(&flagTimer, "timer", "", "")
+	flag.BoolVar(flagAckMode, "ack-mode", false, "")
 }
 
 func main() {
@@ -74,7 +77,7 @@ func main() {
 
 	// Handle timer mode
 	if flagTimer != "" {
-		runTimer(flagTimer, *flagMessage)
+		runTimer(flagTimer, *flagMessage, *flagAckMode)
 		return
 	}
 
@@ -101,10 +104,10 @@ func main() {
 		isError = false
 	}
 
-	showDialog(msg, isError)
+	showDialog(msg, isError, *flagAckMode)
 }
 
-func runTimer(timerDuration string, message string) {
+func runTimer(timerDuration string, message string, ackMode bool) {
 	duration, err := time.ParseDuration(timerDuration)
 	if err != nil {
 		log.Fatalf("Invalid timer duration '%s': %v\nExamples: 25m, 1h30m, 90s", timerDuration, err)
@@ -124,7 +127,7 @@ func runTimer(timerDuration string, message string) {
 		msg = fmt.Sprintf("⏰ %s\n\nDuration: %s", msg, formatDuration(duration))
 	}
 
-	showDialog(msg, false)
+	showDialog(msg, false, ackMode)
 }
 
 func run(executable string, args ...string) error {
@@ -182,7 +185,7 @@ func formatDuration(d time.Duration) string {
 	return fmt.Sprintf("%dh %dm", int(d.Hours()), int(d.Minutes())%60)
 }
 
-func showDialog(msg string, isError bool) {
+func showDialog(msg string, isError bool, ackMode bool) {
 	// Dry-run mode for testing and debugging
 	if os.Getenv("LMK_DRY_RUN") != "" {
 		fmt.Fprintf(os.Stderr, "[DRY RUN] Dialog message: %s\n", msg)
@@ -191,9 +194,8 @@ func showDialog(msg string, isError bool) {
 	}
 
 	// Delay before showing dialog to prevent accidental dismissal
-	// Gives user time to finish typing in other apps before dialog steals focus
-	// Can be customized via LMK_DELAY environment variable
-	delay := 3000 * time.Millisecond // Default: 3 seconds
+	// Can be customized via LMK_DELAY environment variable (default: 0)
+	delay := 0 * time.Millisecond // Default: no delay
 	if delayStr := os.Getenv("LMK_DELAY"); delayStr != "" {
 		if customDelay, err := time.ParseDuration(delayStr); err == nil {
 			delay = customDelay
@@ -211,11 +213,60 @@ func showDialog(msg string, isError bool) {
 	case "linux":
 		// Try yad first (has best always-on-top support)
 		if _, err := exec.LookPath("yad"); err == nil {
-			button := "gtk-ok:0"
 			image := "dialog-information"
 			if isError {
 				image = "dialog-error"
 			}
+
+			// If ack mode is enabled, loop until "Ack" is clicked
+			if ackMode {
+				backoff := 5 * time.Second
+				maxBackoff := 60 * time.Second
+
+				for {
+					// Buttons: Dismiss (focused/default) and Ack
+					cmd = exec.Command("yad",
+						"--text="+msg,
+						"--title=lmk",
+						"--width=450",
+						"--height=150",
+						"--center",
+						"--button=Dismiss:1",
+						"--button=Ack:0",
+						"--image="+image,
+						"--on-top",
+						"--no-escape",
+						"--borders=10")
+
+					if err := cmd.Run(); err == nil {
+						// Exit code 0 = Ack clicked
+						break
+					} else if exitErr, ok := err.(*exec.ExitError); ok {
+						if exitErr.ExitCode() == 1 {
+							// Dismiss clicked - wait and re-show
+							log.Printf("Dismiss clicked, re-showing in %v", backoff)
+							time.Sleep(backoff)
+							// Double backoff, cap at 60s
+							if backoff < maxBackoff {
+								backoff *= 2
+								if backoff > maxBackoff {
+									backoff = maxBackoff
+								}
+							}
+							continue
+						}
+					}
+					// For any other error, just break and log it
+					if err != nil {
+						log.Printf("Error showing dialog: %v", err)
+					}
+					break
+				}
+				return
+			}
+
+			// Normal mode (not ack mode)
+			button := "gtk-ok:0"
 			// yad has proper --on-top and --center support with better sizing
 			cmd = exec.Command("yad",
 				"--text="+msg,
@@ -428,7 +479,8 @@ func processHookPayload() {
 
 	log.Printf("[claude-hooks] Showing dialog")
 	// Show dialog (notifications are informational, not errors)
-	showDialog(msg, false)
+	// Claude hooks don't use ack mode
+	showDialog(msg, false, false)
 	log.Printf("[claude-hooks] Dialog completed")
 }
 

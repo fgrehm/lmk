@@ -30,7 +30,7 @@ func TestShowDialogDryRun(t *testing.T) {
 			r, w, _ := os.Pipe()
 			os.Stderr = w
 
-			showDialog(tt.msg, tt.isError)
+			showDialog(tt.msg, tt.isError, false)
 
 			w.Close()
 			os.Stderr = oldStderr
@@ -96,7 +96,7 @@ func TestTimerDryRun(t *testing.T) {
 
 	// Run a short timer
 	start := time.Now()
-	runTimer("1s", "Test timer")
+	runTimer("1s", "Test timer", false)
 	elapsed := time.Since(start)
 
 	w.Close()

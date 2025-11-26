@@ -30,7 +30,7 @@ func TestDialogDelay(t *testing.T) {
 			}
 
 			start := time.Now()
-			showDialog("test message", false)
+			showDialog("test message", false, false)
 			elapsed := time.Since(start)
 
 			// In dry-run mode, should return immediately
