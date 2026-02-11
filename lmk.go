@@ -9,6 +9,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
@@ -756,7 +757,7 @@ func readOrCreateSettings(path string) ClaudeSettings {
 // writeSettings writes settings to file with proper formatting
 func writeSettings(path string, settings ClaudeSettings) error {
 	// Ensure directory exists
-	dir := fmt.Sprintf("%s", path[:strings.LastIndex(path, "/")])
+	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return fmt.Errorf("failed to create directory: %w", err)
 	}
