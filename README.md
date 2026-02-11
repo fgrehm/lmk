@@ -59,9 +59,10 @@ Usage: lmk [options...] command
    or: lmk -t <duration> [-m <text>]
 
 Options:
-  -m            Message to display in case of success, defaults to "[command] has completed successfully"
-  -t, -timer    Timer duration (e.g., 25m, 1h30m, 90s) - runs a countdown timer instead of a command
-  -version      Show version information
+  -m              Message to display in case of success, defaults to "[command] has completed successfully"
+  -t, -timer      Timer duration (e.g., 25m, 1h30m, 90s) - runs a countdown timer instead of a command
+  -a, -ack-mode   Require explicit acknowledgment (Linux with yad only)
+  -version        Show version information
 ```
 
 ### Examples

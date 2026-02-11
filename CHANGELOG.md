@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.1] - 2026-02-11
+
+### Fixed
+
+- **Dialog fallback cascade** - If a dialog tool (e.g. zenity) is found on PATH but fails at runtime, lmk now tries the next backend instead of giving up
+- **Zenity compatibility** - Fixed `--no-cancel` flag not supported with `--question` dialog by switching to `--info`
+- **Better diagnostics** - Each dialog attempt now logs which backend was selected and captures stderr output
+
 ## [2.2.0] - 2025-11-26
 
 ### Added
