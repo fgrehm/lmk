@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -19,7 +20,7 @@ var (
 	flagAckMode = flag.Bool("a", false, "")
 	flagVersion = flag.Bool("version", false, "")
 
-	version        = "2.2.0"
+	version        = "2.2.1"
 	defaultMessage = "%s has completed successfully"
 )
 
@@ -226,106 +227,13 @@ func showDialog(msg string, isError bool, ackMode bool) {
 		time.Sleep(delay)
 	}
 
-	var cmd *exec.Cmd
-
 	switch runtime.GOOS {
 	case "linux":
-		// Try yad first (has best always-on-top support)
-		if _, err := exec.LookPath("yad"); err == nil {
-			image := "dialog-information"
-			if isError {
-				image = "dialog-error"
-			}
-
-			// If ack mode is enabled, loop until "Ack" is clicked
-			if ackMode {
-				backoff := 5 * time.Second
-				maxBackoff := 60 * time.Second
-
-				for {
-					// Buttons: Dismiss (focused/default) and Ack
-					cmd = exec.Command("yad",
-						"--text="+msg,
-						"--title=lmk",
-						"--width=450",
-						"--height=150",
-						"--center",
-						"--button=Dismiss:1",
-						"--button=Ack:0",
-						"--image="+image,
-						"--on-top",
-						"--no-escape",
-						"--borders=10")
-
-					if err := cmd.Run(); err == nil {
-						// Exit code 0 = Ack clicked
-						break
-					} else if exitErr, ok := err.(*exec.ExitError); ok {
-						if exitErr.ExitCode() == 1 {
-							// Dismiss clicked - wait and re-show
-							log.Printf("Dismiss clicked, re-showing in %v", backoff)
-							time.Sleep(backoff)
-							// Double backoff, cap at 60s
-							if backoff < maxBackoff {
-								backoff *= 2
-								if backoff > maxBackoff {
-									backoff = maxBackoff
-								}
-							}
-							continue
-						}
-					}
-					// For any other error, just break and log it
-					if err != nil {
-						log.Printf("Error showing dialog: %v", err)
-					}
-					break
-				}
-				return
-			}
-
-			// Normal mode (not ack mode)
-			button := "gtk-ok:0"
-			// yad has proper --on-top and --center support with better sizing
-			cmd = exec.Command("yad",
-				"--text="+msg,
-				"--title=lmk",
-				"--width=450",
-				"--height=150",
-				"--center",
-				"--button="+button,
-				"--image="+image,
-				"--on-top",
-				"--no-escape",
-				"--borders=10")
-		} else if _, err := exec.LookPath("zenity"); err == nil {
-			// Fallback to zenity
-			// Use question dialog which stays on top better than info/error dialogs
-			cmd = exec.Command("zenity", "--question", "--title=lmk", "--text="+msg, "--width=400",
-				"--ok-label=OK", "--no-cancel", "--ellipsize")
-		} else if _, err := exec.LookPath("kdialog"); err == nil {
-			// Fallback to kdialog for KDE
-			dialogType := "--msgbox"
-			if isError {
-				dialogType = "--error"
-			}
-			cmd = exec.Command("kdialog", dialogType, msg, "--title", "lmk")
-		} else if _, err := exec.LookPath("notify-send"); err == nil {
-			// Last resort: notify-send with Enter prompt (v1.0.0 behavior)
-			log.Printf("Warning: No dialog tools found (yad/zenity/kdialog)")
-			log.Printf("Falling back to notify-send + Enter prompt")
-			showNotificationAndWait(msg, isError)
-			return
-		} else {
-			log.Printf("Error: No notification tools found!")
-			log.Printf("Please install one of: yad, zenity, kdialog, or notify-send")
-			log.Printf("Message: %s", msg)
-			return
-		}
+		showDialogLinux(msg, isError, ackMode)
+		return
 
 	case "darwin":
-		// macOS: use osascript with dialog - make it giving application
-		// This brings the dialog to the front
+		// macOS: use osascript with dialog
 		icon := "note"
 		if isError {
 			icon = "stop"
@@ -335,37 +243,154 @@ func showDialog(msg string, isError bool, ackMode bool) {
 	display dialog "%s" with title "lmk" with icon %s buttons {"OK"} default button "OK" giving up after 3600
 end tell`,
 			escapeAppleScript(msg), icon)
-		cmd = exec.Command("osascript", "-e", script)
+		cmd := exec.Command("osascript", "-e", script)
+		log.Print("Showing dialog with osascript")
+		var stderr bytes.Buffer
+		cmd.Stderr = &stderr
+		if err := cmd.Run(); err != nil {
+			log.Printf("osascript failed: %v (stderr: %s)", err, strings.TrimSpace(stderr.String()))
+			log.Printf("Message: %s", msg)
+		}
 
 	case "windows":
-		// Windows: use PowerShell dialogs with TopMost property
 		icon := "Information"
 		if isError {
 			icon = "Error"
 		}
-		// Create a form-based messagebox that stays on top
 		psScript := fmt.Sprintf(`Add-Type -AssemblyName System.Windows.Forms; $form = New-Object System.Windows.Forms.Form; $form.TopMost = $true; $form.WindowState = 'Minimized'; $form.Show(); [System.Windows.Forms.MessageBox]::Show($form, '%s', 'lmk', 'OK', '%s'); $form.Close()`,
 			escapeWindowsString(msg), icon)
-		cmd = exec.Command("powershell", "-Command", psScript)
+		cmd := exec.Command("powershell", "-Command", psScript)
+		log.Print("Showing dialog with powershell")
+		var stderr bytes.Buffer
+		cmd.Stderr = &stderr
+		if err := cmd.Run(); err != nil {
+			log.Printf("powershell failed: %v (stderr: %s)", err, strings.TrimSpace(stderr.String()))
+			log.Printf("Message: %s", msg)
+		}
 
 	default:
 		log.Printf("Unsupported platform: %s", runtime.GOOS)
 		log.Printf("Message: %s", msg)
+	}
+}
+
+// showDialogLinux tries dialog backends in order: yad -> zenity -> kdialog -> notify-send.
+// If a backend is found but fails at runtime, it falls through to the next one.
+func showDialogLinux(msg string, isError bool, ackMode bool) {
+	image := "dialog-information"
+	if isError {
+		image = "dialog-error"
+	}
+
+	// Try yad first (has best always-on-top support)
+	if _, err := exec.LookPath("yad"); err == nil {
+		// Ack mode loop (yad-only feature)
+		if ackMode {
+			log.Print("Showing ack-mode dialog with yad")
+			backoff := 5 * time.Second
+			maxBackoff := 60 * time.Second
+
+			for {
+				cmd := exec.Command("yad",
+					"--text="+msg,
+					"--title=lmk",
+					"--width=450",
+					"--height=150",
+					"--center",
+					"--button=Dismiss:1",
+					"--button=Ack:0",
+					"--image="+image,
+					"--on-top",
+					"--no-escape",
+					"--borders=10")
+				var stderr bytes.Buffer
+				cmd.Stderr = &stderr
+
+				err := cmd.Run()
+				if err == nil {
+					// Exit code 0 = Ack clicked
+					return
+				}
+				if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() == 1 {
+					// Dismiss clicked - wait and re-show
+					log.Printf("Dismiss clicked, re-showing in %v", backoff)
+					time.Sleep(backoff)
+					if backoff < maxBackoff {
+						backoff *= 2
+						if backoff > maxBackoff {
+							backoff = maxBackoff
+						}
+					}
+					continue
+				}
+				// Any other error - break out and fall through
+				log.Printf("yad ack-mode failed: %v (stderr: %s)", err, strings.TrimSpace(stderr.String()))
+				break
+			}
+			// yad ack-mode failed, fall through to normal mode with next backend
+		} else {
+			// Normal mode with yad
+			log.Print("Showing dialog with yad")
+			cmd := exec.Command("yad",
+				"--text="+msg,
+				"--title=lmk",
+				"--width=450",
+				"--height=150",
+				"--center",
+				"--button=gtk-ok:0",
+				"--image="+image,
+				"--on-top",
+				"--no-escape",
+				"--borders=10")
+			var stderr bytes.Buffer
+			cmd.Stderr = &stderr
+			if err := cmd.Run(); err != nil {
+				log.Printf("yad failed: %v (stderr: %s)", err, strings.TrimSpace(stderr.String()))
+			} else {
+				return
+			}
+		}
+	}
+
+	// Try zenity
+	if _, err := exec.LookPath("zenity"); err == nil {
+		log.Print("Showing dialog with zenity")
+		cmd := exec.Command("zenity", "--info", "--title=lmk", "--text="+msg, "--width=400")
+		var stderr bytes.Buffer
+		cmd.Stderr = &stderr
+		if err := cmd.Run(); err != nil {
+			log.Printf("zenity failed: %v (stderr: %s)", err, strings.TrimSpace(stderr.String()))
+		} else {
+			return
+		}
+	}
+
+	// Try kdialog
+	if _, err := exec.LookPath("kdialog"); err == nil {
+		log.Print("Showing dialog with kdialog")
+		dialogType := "--msgbox"
+		if isError {
+			dialogType = "--error"
+		}
+		cmd := exec.Command("kdialog", dialogType, msg, "--title", "lmk")
+		var stderr bytes.Buffer
+		cmd.Stderr = &stderr
+		if err := cmd.Run(); err != nil {
+			log.Printf("kdialog failed: %v (stderr: %s)", err, strings.TrimSpace(stderr.String()))
+		} else {
+			return
+		}
+	}
+
+	// Last resort: notify-send with Enter prompt
+	if _, err := exec.LookPath("notify-send"); err == nil {
+		log.Print("Falling back to notify-send + Enter prompt")
+		showNotificationAndWait(msg, isError)
 		return
 	}
 
-	log.Print("Showing dialog")
-
-	// Show what would be executed in dry-run (after cmd is built)
-	if os.Getenv("LMK_DRY_RUN") != "" {
-		fmt.Fprintf(os.Stderr, "[DRY RUN] Would execute: %s %v\n", cmd.Path, cmd.Args[1:])
-		return
-	}
-
-	if err := cmd.Run(); err != nil {
-		log.Printf("Error showing dialog: %v", err)
-		log.Printf("Message: %s", msg)
-	}
+	log.Print("No notification tools found (tried yad, zenity, kdialog, notify-send)")
+	log.Printf("Message: %s", msg)
 }
 
 func escapeAppleScript(s string) string {
