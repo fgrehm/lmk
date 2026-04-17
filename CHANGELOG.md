@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Claude Code skill** - `lmk skill` and `lmk skill install` subcommands ship a bundled `SKILL.md` that teaches Claude Code to notify you when a task finishes
+  - `lmk skill` prints SKILL.md to stdout (pipe-friendly)
+  - `lmk skill install` writes to `~/.claude/skills/lmk/SKILL.md` (global)
+  - `lmk skill install --project` writes to `.claude/skills/lmk/SKILL.md`
+  - `lmk skill install --path PATH` writes to a custom directory
+  - Triggered by phrases like "lmk when done", "let me know when X finishes", "notify me when ready"
+
+### Changed
+
+- **Claude Code hooks are now opt-in per type and default to `idle_prompt` only** - the old behavior of firing on every notification type was too noisy
+  - `lmk claude-hooks install` (no `--type`) now installs only the idle-prompt hook
+  - Valid types trimmed to `idle_prompt` and `permission_prompt`; `auth_success` and `elicitation_dialog` are no longer accepted
+  - For "notify me when Claude finishes its work" use the new skill instead
+
+### Fixed
+
+- **`--type` filter now works at runtime** - previously the flag was baked into the hook command at install time but `processHookPayload` never parsed it, so it was a no-op. Notifications outside the allowed types are now dropped (logged, exit 0)
+
 ## [2.2.2] - 2026-02-11
 
 ### Fixed
