@@ -21,7 +21,7 @@ var (
 	flagAckMode = flag.Bool("a", false, "")
 	flagVersion = flag.Bool("version", false, "")
 
-	version        = "2.2.2"
+	version        = "2.3.0"
 	defaultMessage = "%s has completed successfully"
 )
 
