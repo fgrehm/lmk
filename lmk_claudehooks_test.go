@@ -14,10 +14,10 @@ func TestGetNotificationIcon(t *testing.T) {
 		notificationType string
 		expectedIcon     string
 	}{
-		{"permission_prompt", "🔐"},
 		{"idle_prompt", "⏱️"},
-		{"auth_success", "✅"},
-		{"elicitation_dialog", "📝"},
+		{"permission_prompt", "🔐"},
+		{"auth_success", "🤖"},
+		{"elicitation_dialog", "🤖"},
 		{"unknown_type", "🤖"},
 		{"", "🤖"},
 	}
