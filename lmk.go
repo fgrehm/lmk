@@ -532,18 +532,9 @@ func processHookPayload(ackMode bool, allowedTypes []string) {
 	}
 
 	// Filter by allowed types if --type was passed at install time
-	if len(allowedTypes) > 0 {
-		matched := false
-		for _, t := range allowedTypes {
-			if t == payload.NotificationType {
-				matched = true
-				break
-			}
-		}
-		if !matched {
-			log.Printf("[claude-hooks] Dropping %q (not in allowed types %v)", payload.NotificationType, allowedTypes)
-			return
-		}
+	if len(allowedTypes) > 0 && !isTypeAllowed(payload.NotificationType, allowedTypes) {
+		log.Printf("[claude-hooks] Dropping %q (not in allowed types %v)", payload.NotificationType, allowedTypes)
+		return
 	}
 
 	// Get icon based on notification type
@@ -631,6 +622,15 @@ func getNotificationIcon(notificationType string) string {
 	default:
 		return "🤖"
 	}
+}
+
+func isTypeAllowed(notificationType string, allowedTypes []string) bool {
+	for _, t := range allowedTypes {
+		if t == notificationType {
+			return true
+		}
+	}
+	return false
 }
 
 // installClaudeHooks handles the install subcommand

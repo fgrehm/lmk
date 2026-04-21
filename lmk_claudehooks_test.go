@@ -8,6 +8,29 @@ import (
 	"testing"
 )
 
+func TestIsTypeAllowed(t *testing.T) {
+	tests := []struct {
+		name         string
+		notifType    string
+		allowedTypes []string
+		want         bool
+	}{
+		{"allowed type matches", "idle_prompt", []string{"idle_prompt"}, true},
+		{"allowed type matches second entry", "permission_prompt", []string{"idle_prompt", "permission_prompt"}, true},
+		{"disallowed type dropped", "auth_success", []string{"idle_prompt"}, false},
+		{"disallowed type dropped multi", "elicitation_dialog", []string{"idle_prompt", "permission_prompt"}, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := isTypeAllowed(tt.notifType, tt.allowedTypes)
+			if got != tt.want {
+				t.Errorf("isTypeAllowed(%q, %v) = %v, want %v", tt.notifType, tt.allowedTypes, got, tt.want)
+			}
+		})
+	}
+}
+
 // TestGetNotificationIcon tests the icon mapping for different notification types
 func TestGetNotificationIcon(t *testing.T) {
 	tests := []struct {
