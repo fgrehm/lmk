@@ -483,10 +483,14 @@ func handleClaudeHooks(args []string) {
 	}
 
 	// Otherwise, process hook payload from stdin
-	hookFlags := flag.NewFlagSet("claude-hooks", flag.ExitOnError)
+	hookFlags := flag.NewFlagSet("claude-hooks", flag.ContinueOnError)
+	hookFlags.SetOutput(io.Discard)
 	ackMode := hookFlags.Bool("ack-mode", false, "")
 	typesStr := hookFlags.String("type", "", "")
-	hookFlags.Parse(args)
+	if err := hookFlags.Parse(args); err != nil {
+		log.Printf("[claude-hooks] ignoring invalid flags: %v", err)
+		return
+	}
 
 	var allowed []string
 	if *typesStr != "" {
