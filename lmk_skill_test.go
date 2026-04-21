@@ -48,12 +48,17 @@ func TestSkillInstallDir(t *testing.T) {
 	})
 
 	t.Run("custom_path_wins", func(t *testing.T) {
-		got, err := skillInstallDir(true, "/tmp/my-skills")
+		customPath := filepath.Join(t.TempDir(), "my-skills")
+		want, err := filepath.Abs(customPath)
+		if err != nil {
+			t.Fatalf("failed to resolve custom path: %v", err)
+		}
+		got, err := skillInstallDir(true, customPath)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if got != "/tmp/my-skills" {
-			t.Errorf("expected /tmp/my-skills, got %q", got)
+		if got != want {
+			t.Errorf("expected custom path %q to take precedence over project path, got %q", want, got)
 		}
 	})
 }
