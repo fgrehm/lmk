@@ -1,115 +1,47 @@
-.PHONY: default build test clean install xbuild lint help docker-build docker-image local-build local-test local-xbuild local-lint
+.PHONY: help build test xbuild install clean lint fmt
 
-# Docker configuration
-DOCKER_IMAGE := lmk-builder
-DOCKER_RUN := docker run --rm -v $(PWD):/build -w /build $(DOCKER_IMAGE)
+help: ## Show this help message
+	@echo 'Usage: make [target]'
+	@echo ''
+	@echo 'Available targets:'
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}'
 
-default: build
+build: ## Build the lmk binary
+	@echo "Building lmk..."
+	@mkdir -p dist
+	@go build -ldflags="-s -w" -o dist/lmk .
+	@echo "Built to dist/lmk"
 
-help:
-	@echo "lmk - Makefile targets"
-	@echo ""
-	@echo "Usage: make [target]"
-	@echo ""
-	@echo "Docker-based targets (default):"
-	@echo "  build        Build lmk for current platform using Docker (default)"
-	@echo "  test         Run all tests with race detection and coverage in Docker"
-	@echo "  xbuild       Cross-compile for all platforms in Docker"
-	@echo "  lint         Run golangci-lint in Docker"
-	@echo "  install      Build and symlink lmk to ~/.local/bin"
-	@echo ""
-	@echo "Docker management:"
-	@echo "  docker-image Build the Docker image for compilation"
-	@echo "  docker-build Build lmk binary inside Docker and copy to host"
-	@echo ""
-	@echo "Local targets (no Docker):"
-	@echo "  local-build   Build lmk for current platform locally"
-	@echo "  local-test    Run tests locally"
-	@echo "  local-xbuild  Cross-compile locally"
-	@echo "  local-lint    Run golangci-lint locally"
-	@echo "  local-install Install to GOPATH/bin using go install"
-	@echo ""
-	@echo "Other:"
-	@echo "  clean        Remove build artifacts and coverage files"
-	@echo "  help         Show this help message"
+test: ## Run tests with race detection and coverage
+	@go test -v -race -coverprofile=coverage.txt -covermode=atomic ./...
 
-# Docker image builder
-docker-image:
-	docker build -t $(DOCKER_IMAGE) .
-
-# Main build target using Docker
-build: docker-image
-	$(DOCKER_RUN) go build -v -ldflags="-s -w" -buildvcs=false -o lmk .
-
-# Build Docker image with binary
-docker-build:
-	docker build -t lmk:latest .
-
-# Local build (without Docker)
-local-build:
-	go build -v -ldflags="-s -w" -o lmk .
-
-# Test using Docker
-test: docker-image
-	$(DOCKER_RUN) go test -v -race -coverprofile=coverage.txt -covermode=atomic ./...
-
-# Local test (without Docker)
-local-test:
-	go test -v -race -coverprofile=coverage.txt -covermode=atomic ./...
-
-clean:
-	rm -rf lmk build/ dist/ coverage.txt
-
-# Install using Docker - builds binary and symlinks to ~/.local/bin
-install: build
-	@mkdir -p ~/.local/bin
-	@ln -sf $(PWD)/lmk ~/.local/bin/lmk
-	@echo "Symlinked $(PWD)/lmk -> ~/.local/bin/lmk"
-	@echo "Make sure ~/.local/bin is in your PATH"
-
-# Local install (without Docker)
-local-install:
-	go install -v -ldflags="-s -w" .
-
-# Cross-compilation for multiple architectures using Docker
-xbuild: docker-image
-	@mkdir -p build
+xbuild: ## Cross-compile for all platforms
+	@mkdir -p dist
 	@echo "Building for Linux amd64..."
-	$(DOCKER_RUN) sh -c "GOOS=linux GOARCH=amd64 go build -ldflags='-s -w' -buildvcs=false -o build/lmk-linux-amd64 ."
+	@GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o dist/lmk-linux-amd64 .
 	@echo "Building for Linux arm64..."
-	$(DOCKER_RUN) sh -c "GOOS=linux GOARCH=arm64 go build -ldflags='-s -w' -buildvcs=false -o build/lmk-linux-arm64 ."
+	@GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o dist/lmk-linux-arm64 .
 	@echo "Building for macOS amd64..."
-	$(DOCKER_RUN) sh -c "GOOS=darwin GOARCH=amd64 go build -ldflags='-s -w' -buildvcs=false -o build/lmk-darwin-amd64 ."
+	@GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o dist/lmk-darwin-amd64 .
 	@echo "Building for macOS arm64..."
-	$(DOCKER_RUN) sh -c "GOOS=darwin GOARCH=arm64 go build -ldflags='-s -w' -buildvcs=false -o build/lmk-darwin-arm64 ."
+	@GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o dist/lmk-darwin-arm64 .
 	@echo "Building for Windows amd64..."
-	$(DOCKER_RUN) sh -c "GOOS=windows GOARCH=amd64 go build -ldflags='-s -w' -buildvcs=false -o build/lmk-windows-amd64.exe ."
+	@GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o dist/lmk-windows-amd64.exe .
 	@echo "Building for Windows arm64..."
-	$(DOCKER_RUN) sh -c "GOOS=windows GOARCH=arm64 go build -ldflags='-s -w' -buildvcs=false -o build/lmk-windows-arm64.exe ."
-	@echo 'DONE'
+	@GOOS=windows GOARCH=arm64 go build -ldflags="-s -w" -o dist/lmk-windows-arm64.exe .
+	@echo "Done"
 
-# Local cross-compilation (without Docker)
-local-xbuild:
-	@mkdir -p build
-	@echo "Building for Linux amd64..."
-	GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o build/lmk-linux-amd64 .
-	@echo "Building for Linux arm64..."
-	GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o build/lmk-linux-arm64 .
-	@echo "Building for macOS amd64..."
-	GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o build/lmk-darwin-amd64 .
-	@echo "Building for macOS arm64..."
-	GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o build/lmk-darwin-arm64 .
-	@echo "Building for Windows amd64..."
-	GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o build/lmk-windows-amd64.exe .
-	@echo "Building for Windows arm64..."
-	GOOS=windows GOARCH=arm64 go build -ldflags="-s -w" -o build/lmk-windows-arm64.exe .
-	@echo 'DONE'
+install: build ## Install lmk to ~/.local/bin (symlink)
+	@mkdir -p "$(HOME)/.local/bin"
+	@ln -sf "$(CURDIR)/dist/lmk" "$(HOME)/.local/bin/lmk"
+	@echo "Installed to ~/.local/bin/lmk"
 
-# Lint using Docker
-lint: docker-image
-	$(DOCKER_RUN) sh -c "which golangci-lint > /dev/null || (echo 'golangci-lint not installed in Docker image' && exit 1); golangci-lint run ./..."
+clean: ## Remove build artifacts
+	@rm -rf dist/ coverage.txt
+	@echo "Cleaned"
 
-# Local lint (without Docker)
-local-lint:
-	@which golangci-lint > /dev/null || (echo "golangci-lint not installed" && exit 1)
-	golangci-lint run ./...
+lint: ## Run golangci-lint
+	@go tool golangci-lint run ./...
+
+fmt: ## Format code with golangci-lint
+	@go tool golangci-lint fmt ./...

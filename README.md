@@ -135,6 +135,48 @@ Output shows what would happen:
 [DRY RUN] Is error: false
 ```
 
+### Claude Code integration
+
+lmk ships two complementary pieces for [Claude Code](https://docs.claude.com/en/docs/claude-code):
+
+- **A skill** (model-invoked): when you say "run the tests and lmk when done", Claude runs the task and fires a desktop dialog on completion.
+- **A hook** (system-invoked): when Claude has been idle waiting on you, the shell notifies you so you don't leave it hanging.
+
+They answer different questions — skill = "tell me when *you're* done", hook = "tell me when *Claude is stuck on me*" — and you can install either, both, or neither.
+
+#### Skill
+
+```bash
+# Install the skill globally (~/.claude/skills/lmk/SKILL.md)
+lmk skill install
+
+# Or project-local (.claude/skills/lmk/SKILL.md)
+lmk skill install --project
+
+# Or print it so you can pipe it wherever you want
+lmk skill > ~/some/custom/path/SKILL.md
+```
+
+Once installed, phrases like "lmk when done", "let me know when the build finishes", or "notify me when ready" will cause Claude to run `lmk -m "<summary>"` at the end of the task.
+
+#### Hooks
+
+```bash
+# Install the idle-prompt hook (project-local)
+lmk claude-hooks install
+
+# Install globally
+lmk claude-hooks install --global
+
+# Also notify on permission prompts (useful when AFK)
+lmk claude-hooks install --type idle_prompt,permission_prompt
+
+# Uninstall
+lmk claude-hooks install --uninstall
+```
+
+The default only installs `idle_prompt` — the "Claude has been waiting on you for a while" signal. `permission_prompt` is available as opt-in for AFK workflows. Other notification types are intentionally not supported (too noisy). See `/tmp/lmk-claude-hooks.log` for debug output.
+
 ### Platform Dependencies
 
 - **Linux**: Requires one of the following (in order of preference):

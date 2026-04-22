@@ -21,13 +21,14 @@ var (
 	flagAckMode = flag.Bool("a", false, "")
 	flagVersion = flag.Bool("version", false, "")
 
-	version        = "2.2.2"
+	version        = "2.3.0"
 	defaultMessage = "%s has completed successfully"
 )
 
 var usage = `Usage: lmk [options...] command
    or: lmk -t <duration> [-m <text>]
    or: lmk claude-hooks [install [options]]
+   or: lmk skill [install [options]]
 
 Options:
   -m                Message to display in case of success, defaults to "[command] has completed successfully"
@@ -39,19 +40,26 @@ Subcommands:
   claude-hooks           Process Claude Code notification hooks (reads JSON from stdin)
   claude-hooks install   Install lmk hooks into Claude Code settings
     --global               Install to ~/.claude/settings.json (default: .claude/settings.local.json)
-    --type TYPES           Only install for specific notification types (comma-separated)
+    --type TYPES           Notification types to notify on (comma-separated, default: idle_prompt)
+                           Valid: idle_prompt, permission_prompt
     --ack-mode             Require explicit acknowledgment for claude hook dialogs
     --uninstall            Remove lmk hooks from configuration
+    --dry-run              Show what would be changed without modifying files
+
+  skill                  Print the bundled Claude Code skill (SKILL.md) to stdout
+  skill install          Install the skill to ~/.claude/skills/lmk/SKILL.md (or --project, --path)
+    --project              Install to ./.claude/skills/lmk/SKILL.md (project-local)
+    --path PATH            Install to a specific directory
     --dry-run              Show what would be changed without modifying files
 
 Examples:
   lmk npm test                                    Run command and notify when done
   lmk -t 25m -m "Pomodoro done!"                 25 minute timer
   lmk -t 5m -m "Break over!"                     5 minute break timer
-  lmk claude-hooks install                        Install Claude Code hooks (project-local)
-  lmk claude-hooks install --global               Install Claude Code hooks (globally)
-  lmk claude-hooks install --type permission_prompt,idle_prompt
-                                                  Install hooks for specific notification types
+  lmk skill install                               Install the Claude Code skill globally
+  lmk claude-hooks install                        Install idle-prompt hook (project-local)
+  lmk claude-hooks install --type idle_prompt,permission_prompt
+                                                  Also notify on permission prompts
 `
 
 func init() {
@@ -71,11 +79,17 @@ func main() {
 		os.Exit(0)
 	}
 
-	// Check for claude-hooks subcommand
+	// Check for subcommands
 	args := flag.Args()
-	if len(args) > 0 && args[0] == "claude-hooks" {
-		handleClaudeHooks(args[1:])
-		return
+	if len(args) > 0 {
+		switch args[0] {
+		case "claude-hooks":
+			handleClaudeHooks(args[1:])
+			return
+		case "skill":
+			handleSkill(args[1:])
+			return
+		}
 	}
 
 	// Handle timer mode
@@ -469,16 +483,29 @@ func handleClaudeHooks(args []string) {
 	}
 
 	// Otherwise, process hook payload from stdin
-	// Parse flags for non-install case
 	hookFlags := flag.NewFlagSet("claude-hooks", flag.ContinueOnError)
+	hookFlags.SetOutput(io.Discard)
 	ackMode := hookFlags.Bool("ack-mode", false, "")
-	hookFlags.Parse(args)
+	typesStr := hookFlags.String("type", "", "")
+	if err := hookFlags.Parse(args); err != nil {
+		log.Printf("[claude-hooks] ignoring invalid flags: %v", err)
+		return
+	}
 
-	processHookPayload(*ackMode)
+	var allowed []string
+	if *typesStr != "" {
+		for _, t := range strings.Split(*typesStr, ",") {
+			allowed = append(allowed, strings.TrimSpace(t))
+		}
+	}
+
+	processHookPayload(*ackMode, allowed)
 }
 
-// processHookPayload reads and processes a hook payload from stdin
-func processHookPayload(ackMode bool) {
+// processHookPayload reads and processes a hook payload from stdin.
+// If allowedTypes is non-empty, payloads whose notification_type is not in the
+// list are dropped silently (exit 0 so Claude Code doesn't flag a hook error).
+func processHookPayload(ackMode bool, allowedTypes []string) {
 	// Setup logging for debugging hooks
 	logFile := setupClaudeHooksLogging()
 	if logFile != nil {
@@ -506,6 +533,12 @@ func processHookPayload(ackMode bool) {
 	}
 	if payload.Message == "" {
 		log.Fatalf("[claude-hooks] Missing required field: message")
+	}
+
+	// Filter by allowed types if --type was passed at install time
+	if len(allowedTypes) > 0 && !isTypeAllowed(payload.NotificationType, allowedTypes) {
+		log.Printf("[claude-hooks] Dropping %q (not in allowed types %v)", payload.NotificationType, allowedTypes)
+		return
 	}
 
 	// Get icon based on notification type
@@ -586,17 +619,22 @@ func setupClaudeHooksLogging() *os.File {
 // getNotificationIcon returns an emoji icon for the notification type
 func getNotificationIcon(notificationType string) string {
 	switch notificationType {
-	case "permission_prompt":
-		return "🔐"
 	case "idle_prompt":
 		return "⏱️"
-	case "auth_success":
-		return "✅"
-	case "elicitation_dialog":
-		return "📝"
+	case "permission_prompt":
+		return "🔐"
 	default:
 		return "🤖"
 	}
+}
+
+func isTypeAllowed(notificationType string, allowedTypes []string) bool {
+	for _, t := range allowedTypes {
+		if t == notificationType {
+			return true
+		}
+	}
+	return false
 }
 
 // installClaudeHooks handles the install subcommand
@@ -611,23 +649,27 @@ func installClaudeHooks(args []string) {
 
 	installFlags.Parse(args)
 
-	// Parse types if provided
+	// Default to idle_prompt if no --type given. idle_prompt is the "you forgot about me"
+	// signal; permission_prompt is available as opt-in for AFK workflows. Other notification
+	// types are noisy and intentionally not supported here — use the skill instead.
+	if *typesStr == "" && !*uninstall {
+		*typesStr = "idle_prompt"
+	}
+
 	var types []string
 	if *typesStr != "" {
-		types = strings.Split(*typesStr, ",")
-		// Validate types
 		validTypes := map[string]bool{
-			"permission_prompt":  true,
-			"idle_prompt":        true,
-			"auth_success":       true,
-			"elicitation_dialog": true,
+			"idle_prompt":       true,
+			"permission_prompt": true,
 		}
-		for _, t := range types {
+		for _, t := range strings.Split(*typesStr, ",") {
 			t = strings.TrimSpace(t)
 			if !validTypes[t] {
-				log.Fatalf("Invalid notification type: %s\nValid types: permission_prompt, idle_prompt, auth_success, elicitation_dialog", t)
+				log.Fatalf("Invalid notification type: %s\nValid types: idle_prompt, permission_prompt", t)
 			}
+			types = append(types, t)
 		}
+		*typesStr = strings.Join(types, ",")
 	}
 
 	// Get settings file path
